@@ -1,0 +1,8 @@
+{
+  "name": "WOD",
+  "short_name": "WOD",
+  "display": "standalone",
+  "background_color": "#0c0c0c",
+  "theme_color": "#0c0c0c",
+  "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
+}

@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>WOD</title>
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WOD">
+<meta name="theme-color" content="#0c0c0c">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  /* MakeTheClick design language: near-black ground with a 2px dither, #1c1c1c panels,
+     off-white type, one blue, Geist / Geist Mono, square corners, no shadows or gradients. */
+  :root { --ground:#0c0c0c; --panel:#1c1c1c; --line:#2a2a2a; --ink:#f4f4f4; --mid:#959595; --blue:#1961ed; --ok:#2fbf71; --bad:#e5484d; }
+  * { box-sizing: border-box; margin: 0; border-radius: 0; }
+  html { background: var(--ground); color: var(--ink); -webkit-text-size-adjust: 100%; }
+  body { font: 16px/1.45 "Geist", system-ui, -apple-system, sans-serif; min-height: 100dvh;
+         padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 96px); }
+  body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
+    background-image: repeating-conic-gradient(rgb(244 244 244 / .07) 0% 25%, transparent 0% 50%); background-size: 2px 2px; }
+  .mono, .label, input.mono { font-family: "Geist Mono", ui-monospace, monospace; }
+  .label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); }
+  h1 { font-size: 32px; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; }
+  h2 { font-size: 18px; font-weight: 500; }
+  header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 24px; }
+  .panel { background: var(--panel); border: 1px solid var(--line); padding: 16px; margin-bottom: 12px; }
+  .stack > * + * { margin-top: 10px; }
+  button { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line); padding: 12px 16px; cursor: pointer; }
+  button.primary { background: var(--blue); border-color: var(--blue); font-weight: 500; }
+  button:disabled { opacity: .5; }
+  .big { width: 100%; padding: 28px 16px; font-size: 20px; }
+  input, textarea, select { font: inherit; color: var(--ink); background: var(--ground); border: 1px solid var(--line); padding: 10px 12px; width: 100%; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--blue); }
+  textarea { min-height: 84px; resize: vertical; font-size: 15px; }
+  .row { display:flex; gap: 8px; align-items: center; }
+  .row > .grow { flex: 1; }
+  .seg { display:flex; } .seg button { flex:1; padding: 10px; } .seg button + button { border-left: 0; }
+  .seg button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
+  nav { position: fixed; left: 0; right: 0; bottom: 0; display:flex; background: var(--ground); border-top: 1px solid var(--line);
+        padding-bottom: env(safe-area-inset-bottom); }
+  nav button { flex:1; border: 0; padding: 16px; font-family: "Geist Mono", monospace; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); }
+  nav button.on { color: var(--ink); box-shadow: inset 0 2px 0 var(--blue); }
+  .muted { color: var(--mid); } .small { font-size: 13px; }
+  .pr { color: var(--blue); }
+  .hist-head { display:flex; justify-content:space-between; gap: 12px; align-items: baseline; }
+  .entry { display:flex; justify-content:space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
+  svg.spark { width: 100%; height: 48px; display:block; margin: 8px 0; }
+  .toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 72px); padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); }
+  .toast.ok { border-color: var(--ok); } .toast.err { border-color: var(--bad); }
+  .hidden { display: none !important; }
+  .spin { display:inline-block; width: 10px; height: 10px; background: var(--blue); animation: blink .8s steps(2) infinite; margin-right: 8px; }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+</style>
+</head>
+<body>
+
+<section id="setup" class="hidden">
+  <header><h1>WOD</h1></header>
+  <div class="panel stack">
+    <p class="label">Access token</p>
+    <input id="tokenIn" class="mono" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="paste token">
+    <button class="primary" id="tokenSave">Save</button>
+  </div>
+</section>
+
+<section id="log">
+  <header><h1>WOD</h1><span class="label mono" id="today"></span></header>
+  <div id="capture">
+    <label class="panel" style="display:block;padding:0;border:0;background:none">
+      <input id="photo" type="file" accept="image/*" capture="environment" class="hidden">
+      <span class="primary big" style="display:block;text-align:center;background:var(--blue);padding:28px 16px;font-size:20px;font-weight:500">Snap the board</span>
+    </label>
+    <button id="manual" style="width:100%">Log without a photo</button>
+    <p class="muted small" id="status" style="margin-top:16px"></p>
+  </div>
+  <div id="review" class="hidden">
+    <div class="row" style="margin-bottom:12px">
+      <p class="label grow">Your results</p>
+      <input id="day" type="date" class="mono" style="width:auto">
+    </div>
+    <div id="parts"></div>
+    <button id="addPart" style="width:100%;margin-bottom:12px">Add a part</button>
+    <div class="row">
+      <button id="cancel">Cancel</button>
+      <button id="save" class="primary grow">Save</button>
+    </div>
+  </div>
+</section>
+
+<section id="history" class="hidden">
+  <header><h1>Progress</h1><span class="label mono" id="count"></span></header>
+  <input id="filter" placeholder="Filter: squat, fran, thrusters..." style="margin-bottom:12px">
+  <div id="groups"></div>
+</section>
+
+<nav>
+  <button data-tab="log" class="on">Log</button>
+  <button data-tab="history">Progress</button>
+</nav>
+
+<div id="toast" class="toast hidden"></div>
+
+<template id="partTpl">
+  <div class="panel stack part">
+    <div class="row">
+      <input class="title grow" placeholder="Back Squat / Fran / 21-15-9 ...">
+      <button class="drop" aria-label="Remove part">×</button>
+    </div>
+    <select class="kind">
+      <option value="strength">Strength (kg)</option>
+      <option value="for_time">For time (mm:ss)</option>
+      <option value="amrap">AMRAP (rounds+reps)</option>
+      <option value="emom">EMOM</option>
+      <option value="other">Other</option>
+    </select>
+    <textarea class="prescription" placeholder="What the board said"></textarea>
+    <div class="row">
+      <input class="score mono grow" inputmode="text" autocomplete="off">
+      <div class="seg"><button class="rx on" type="button">RX</button><button class="sc" type="button">Scaled</button></div>
+    </div>
+    <input class="notes" placeholder="Notes (optional)">
+  </div>
+</template>
+
+<script>
+const API = "https://ktotbpvtkaubecmodgyb.supabase.co/functions/v1/wod";
+const $ = (s, el = document) => el.querySelector(s);
+const store = {
+  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
+};
+
+// Token: from the link (#t=...) the first time, then from storage.
+const hashToken = new URLSearchParams(location.hash.slice(1)).get("t");
+if (hashToken) store.set("wodToken", hashToken);
+let token = store.get("wodToken") || hashToken;
+
+const today = () => new Date().toLocaleDateString("en-CA");
+$("#today").textContent = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+
+function toast(msg, kind = "ok") {
+  const t = $("#toast"); t.textContent = msg; t.className = `toast ${kind}`;
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 3500);
+}
+
+async function api(path, opts = {}) {
+  const r = await fetch(`${API}/${path}`, { ...opts, headers: { "content-type": "application/json", "x-app-token": token } });
+  const body = await r.json().catch(() => ({}));
+  if (r.status === 401) { showSetup(); throw new Error("Token rejected"); }
+  if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
+  return body;
+}
+
+function showSetup() { $("#setup").classList.remove("hidden"); $("#log").classList.add("hidden"); $("nav").classList.add("hidden"); }
+$("#tokenSave").onclick = () => {
+  token = $("#tokenIn").value.trim(); if (!token) return;
+  store.set("wodToken", token); $("#setup").classList.add("hidden"); $("#log").classList.remove("hidden"); $("nav").classList.remove("hidden");
+};
+if (!token) showSetup();
+
+// Tabs
+document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
+  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
+  $("#log").classList.toggle("hidden", b.dataset.tab !== "log");
+  $("#history").classList.toggle("hidden", b.dataset.tab !== "history");
+  if (b.dataset.tab === "history") loadHistory();
+});
+
+// Score: what Paul types, and the one number charts use.
+const PLACEHOLDER = { strength: "Top set, kg", for_time: "Time, e.g. 8:42", amrap: "Rounds+reps, e.g. 5+12", emom: "Score", other: "Score" };
+function scoreValue(kind, s) {
+  s = (s || "").trim(); if (!s) return null;
+  if (kind === "for_time" && s.includes(":")) { const [m, sec] = s.split(":").map(Number); return m * 60 + (sec || 0); }
+  // ponytail: rounds + reps/1000 orders AMRAPs correctly without knowing reps per round
+  if (kind === "amrap" && s.includes("+")) { const [r, reps] = s.split("+").map(Number); return r + (reps || 0) / 1000; }
+  const n = parseFloat(s.replace(",", ".")); return Number.isFinite(n) ? n : null;
+}
+const lowerIsBetter = kind => kind === "for_time";
+
+// Review
+function addPart(p = {}) {
+  const el = $("#partTpl").content.firstElementChild.cloneNode(true);
+  $(".title", el).value = p.title || "";
+  $(".kind", el).value = p.kind || "other";
+  $(".prescription", el).value = p.prescription || "";
+  const setPh = () => $(".score", el).placeholder = PLACEHOLDER[$(".kind", el).value];
+  $(".kind", el).onchange = setPh; setPh();
+  $(".rx", el).onclick = () => { $(".rx", el).classList.add("on"); $(".sc", el).classList.remove("on"); };
+  $(".sc", el).onclick = () => { $(".sc", el).classList.add("on"); $(".rx", el).classList.remove("on"); };
+  $(".drop", el).onclick = () => el.remove();
+  $("#parts").append(el);
+}
+function openReview(parts) {
+  $("#parts").innerHTML = ""; parts.forEach(addPart);
+  $("#day").value = today();
+  $("#capture").classList.add("hidden"); $("#review").classList.remove("hidden");
+}
+function closeReview() { $("#review").classList.add("hidden"); $("#capture").classList.remove("hidden"); $("#status").textContent = ""; }
+$("#addPart").onclick = () => addPart();
+$("#manual").onclick = () => openReview([{}]);
+$("#cancel").onclick = closeReview;
+
+// Photo: shrink on the phone first (a 12 MP shot is ~4 MB; 1600 px JPEG reads just as well).
+function shrink(file) {
+  return new Promise((ok, fail) => {
+    const img = new Image();
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k;
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(img.src); ok(c.toDataURL("image/jpeg", 0.85));
+    };
+    img.onerror = () => fail(new Error("Could not open that photo"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+$("#photo").onchange = async e => {
+  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+  $("#status").innerHTML = '<span class="spin"></span>Reading the board...';
+  try {
+    const { parts } = await api("parse", { method: "POST", body: JSON.stringify({ image: await shrink(file) }) });
+    openReview(parts);
+  } catch (err) {
+    $("#status").textContent = `Could not read it: ${err.message}. Try again or log without a photo.`;
+  }
+};
+
+$("#save").onclick = async () => {
+  const day = $("#day").value || today();
+  const results = [...document.querySelectorAll("#parts .part")].map(el => {
+    const kind = $(".kind", el).value, score = $(".score", el).value.trim();
+    return { day, kind, title: $(".title", el).value.trim(), prescription: $(".prescription", el).value.trim() || null,
+             score: score || null, score_value: scoreValue(kind, score), rx: $(".rx", el).classList.contains("on"),
+             notes: $(".notes", el).value.trim() || null };
+  }).filter(r => r.title);
+  if (!results.length) return toast("Give each part a name", "err");
+  $("#save").disabled = true;
+  try { await api("save", { method: "POST", body: JSON.stringify({ results }) }); toast(`Saved ${results.length} part${results.length > 1 ? "s" : ""}`); closeReview(); }
+  catch (err) { toast(`Not saved: ${err.message}`, "err"); }
+  finally { $("#save").disabled = false; }
+};
+
+// History: grouped by title, best result, a sparkline of every scored entry.
+let rows = [];
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmtDay = d => new Date(d + "T12:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
+
+function spark(points, lower) {
+  if (points.length < 2) return "";
+  const vs = points.map(p => p.score_value), min = Math.min(...vs), max = Math.max(...vs), span = max - min || 1;
+  const xy = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * 296 + 2, t = (p.score_value - min) / span;
+    return [x, 4 + 40 * (lower ? t : 1 - t)];
+  });
+  return `<svg class="spark" viewBox="0 0 300 48" preserveAspectRatio="none" aria-hidden="true">
+    <polyline points="${xy.map(p => p.join(",")).join(" ")}" fill="none" stroke="#1961ed" stroke-width="2" vector-effect="non-scaling-stroke"/>
+    ${xy.map(([x, y]) => `<rect x="${x - 2}" y="${y - 2}" width="4" height="4" fill="#f4f4f4"/>`).join("")}</svg>`;
+}
+
+function renderHistory() {
+  const q = $("#filter").value.trim().toLowerCase();
+  const groups = new Map();
+  for (const r of rows) {
+    if (q && !(r.title + " " + (r.prescription || "")).toLowerCase().includes(q)) continue;
+    const k = r.title.trim().toLowerCase();
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(r);
+  }
+  $("#count").textContent = `${rows.length} logged`;
+  $("#groups").innerHTML = [...groups.values()].map(list => {
+    const lower = lowerIsBetter(list[0].kind);
+    const scored = list.filter(r => r.score_value != null && r.rx);   // PR counts RX only
+    const best = scored.reduce((b, r) => !b || (lower ? r.score_value < b.score_value : r.score_value > b.score_value) ? r : b, null);
+    const chrono = list.filter(r => r.score_value != null).slice().reverse();
+    return `<div class="panel">
+      <div class="hist-head"><h2>${esc(list[0].title)}</h2><span class="label">${list.length}×</span></div>
+      ${best ? `<p class="mono small pr">PR ${esc(best.score)} · ${fmtDay(best.day)}</p>` : ""}
+      ${spark(chrono, lower)}
+      ${list.map(r => `<div class="entry"><span class="mono muted">${fmtDay(r.day)}</span>
+        <span class="mono">${esc(r.score || "-")}${r.rx ? "" : " <span class='muted'>sc</span>"}${r === best ? " <span class='pr'>PR</span>" : ""}</span>
+        <button class="del small muted" data-id="${r.id}" style="padding:0 4px;border:0">×</button></div>
+        ${r.notes ? `<p class="muted small">${esc(r.notes)}</p>` : ""}`).join("")}
+    </div>`;
+  }).join("") || `<p class="muted">Nothing logged yet.</p>`;
+}
+$("#filter").oninput = renderHistory;
+$("#groups").onclick = async e => {
+  const b = e.target.closest(".del"); if (!b) return;
+  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "delete?"; b.style.color = "var(--bad)"; return; }
+  try { await api(`delete?id=${b.dataset.id}`, { method: "DELETE" }); rows = rows.filter(r => r.id !== b.dataset.id); renderHistory(); }
+  catch (err) { toast(err.message, "err"); }
+};
+async function loadHistory() {
+  try { rows = await api("list"); renderHistory(); } catch (err) { toast(err.message, "err"); }
+}
+</script>
+</body>
+</html>
