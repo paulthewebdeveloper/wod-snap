@@ -5,163 +5,305 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>WOD</title>
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="WOD">
-<meta name="theme-color" content="#0c0c0c">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-  /* MakeTheClick design language: near-black ground with a 2px dither, #1c1c1c panels,
-     off-white type, one blue, Geist / Geist Mono, square corners, no shadows or gradients. */
-  :root { --ground:#0c0c0c; --panel:#1c1c1c; --line:#2a2a2a; --ink:#f4f4f4; --mid:#959595; --blue:#1961ed; --ok:#2fbf71; --bad:#e5484d; }
-  * { box-sizing: border-box; margin: 0; border-radius: 0; }
-  html { background: var(--ground); color: var(--ink); -webkit-text-size-adjust: 100%; }
-  body { font: 16px/1.45 "Geist", system-ui, -apple-system, sans-serif; min-height: 100dvh;
-         padding: calc(env(safe-area-inset-top) + 16px) 16px calc(env(safe-area-inset-bottom) + 96px); }
-  body::before { content:""; position:fixed; inset:0; z-index:-1; pointer-events:none;
-    background-image: repeating-conic-gradient(rgb(244 244 244 / .07) 0% 25%, transparent 0% 50%); background-size: 2px 2px; }
-  .mono, .label, input.mono { font-family: "Geist Mono", ui-monospace, monospace; }
-  .label { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); }
-  h1 { font-size: 32px; font-weight: 500; letter-spacing: -.02em; line-height: 1.1; }
-  h2 { font-size: 18px; font-weight: 500; }
-  header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 24px; }
-  .panel { background: var(--panel); border: 1px solid var(--line); padding: 16px; margin-bottom: 12px; }
-  .stack > * + * { margin-top: 10px; }
-  button { font: inherit; color: var(--ink); background: transparent; border: 1px solid var(--line); padding: 12px 16px; cursor: pointer; }
-  button.primary { background: var(--blue); border-color: var(--blue); font-weight: 500; }
-  button:disabled { opacity: .5; }
-  .big { width: 100%; padding: 28px 16px; font-size: 20px; }
-  input, textarea, select { font: inherit; color: var(--ink); background: var(--ground); border: 1px solid var(--line); padding: 10px 12px; width: 100%; }
-  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--blue); }
-  textarea { min-height: 84px; resize: vertical; font-size: 15px; }
-  .row { display:flex; gap: 8px; align-items: center; }
-  .row > .grow { flex: 1; }
-  .seg { display:flex; } .seg button { flex:1; padding: 10px; } .seg button + button { border-left: 0; }
-  .seg button.on { background: var(--ink); color: var(--ground); border-color: var(--ink); }
-  nav { position: fixed; left: 0; right: 0; bottom: 0; display:flex; background: var(--ground); border-top: 1px solid var(--line);
-        padding-bottom: env(safe-area-inset-bottom); }
-  nav button { flex:1; border: 0; padding: 16px; font-family: "Geist Mono", monospace; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--mid); }
-  nav button.on { color: var(--ink); box-shadow: inset 0 2px 0 var(--blue); }
-  .muted { color: var(--mid); } .small { font-size: 13px; }
-  .pr { color: var(--blue); }
-  .hist-head { display:flex; justify-content:space-between; gap: 12px; align-items: baseline; }
-  .entry { display:flex; justify-content:space-between; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); font-size: 14px; }
-  svg.spark { width: 100%; height: 48px; display:block; margin: 8px 0; }
-  .toast { position: fixed; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 72px); padding: 12px 16px; background: var(--panel); border: 1px solid var(--line); }
-  .toast.ok { border-color: var(--ok); } .toast.err { border-color: var(--bad); }
+  /* Apple's system colours, light and dark, following the phone. Blue = anything you can tap and charts,
+     green = records and switches, red = delete only, grays for everything else. */
+  :root {
+    --bg: #F2F2F7; --card: #FFFFFF; --sheet: #F2F2F7; --sheet-card: #FFFFFF; --input: rgba(118,118,128,.12);
+    --label: #000000; --label2: rgba(60,60,67,.6); --label3: rgba(60,60,67,.3); --sep: rgba(60,60,67,.18);
+    --blue: #007AFF; --blue-tint: rgba(0,122,255,.12); --green: #34C759; --green-text: #248A3D; --red: #FF3B30;
+    --bar: rgba(249,249,249,.8); --seg-on: #FFFFFF; --seg-shadow: 0 3px 8px rgba(0,0,0,.12); --switch-off: rgba(120,120,128,.16);
+    --scrim: rgba(0,0,0,.35);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #000000; --card: #1C1C1E; --sheet: #1C1C1E; --sheet-card: #2C2C2E; --input: #3A3A3C;
+      --label: #FFFFFF; --label2: rgba(235,235,245,.6); --label3: rgba(235,235,245,.3); --sep: rgba(84,84,88,.6);
+      --blue: #0A84FF; --blue-tint: rgba(10,132,255,.18); --green: #30D158; --green-text: #30D158; --red: #FF453A;
+      --bar: rgba(28,28,30,.72); --seg-on: #636366; --seg-shadow: none; --switch-off: rgba(120,120,128,.32);
+      --scrim: rgba(0,0,0,.55);
+    }
+  }
+  * { box-sizing: border-box; margin: 0; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); color: var(--label); -webkit-text-size-adjust: 100%; }
+  body { font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif; background: var(--bg);
+         min-height: 100dvh; overscroll-behavior-y: none; }
+  button, input, textarea, select { font: inherit; color: inherit; }
+  button { border: 0; background: none; cursor: pointer; padding: 0; }
   .hidden { display: none !important; }
-  .spin { display:inline-block; width: 10px; height: 10px; background: var(--blue); animation: blink .8s steps(2) infinite; margin-right: 8px; }
-  @keyframes blink { 50% { opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .spin { animation: none; } }
+  .num { font-variant-numeric: tabular-nums; }
+
+  /* Press feedback lives on touch-down. */
+  .press { transition: transform 100ms ease-out, opacity 100ms ease-out; }
+  .press:active { transform: scale(.97); opacity: .85; }
+
+  .view { padding: calc(env(safe-area-inset-top) + 20px) 20px calc(env(safe-area-inset-bottom) + 110px); }
+  .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--label2); }
+  h1 { font-size: 34px; font-weight: 700; line-height: 1.1; letter-spacing: -.02em; }
+  h2 { font-size: 22px; font-weight: 700; letter-spacing: -.01em; }
+  h3 { font-size: 20px; font-weight: 700; letter-spacing: -.01em; }
+  .sub { font-size: 15px; color: var(--label2); line-height: 1.4; }
+  .small { font-size: 13px; color: var(--label2); }
+  .stack > * + * { margin-top: 20px; }
+  .card { background: var(--card); border-radius: 16px; overflow: hidden; }
+  .hero { background: var(--card); border-radius: 22px; padding: 20px; display: flex; flex-direction: column; gap: 16px; }
+  .icon-tile { width: 52px; height: 52px; border-radius: 14px; background: var(--blue-tint); color: var(--blue); display: grid; place-items: center; }
+  .btn { height: 50px; border-radius: 14px; background: var(--blue); color: #fff; font-weight: 600; width: 100%; }
+  .btn2 { height: 44px; border-radius: 12px; background: var(--input); color: var(--blue); font-size: 15px; font-weight: 500;
+          display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; }
+  .grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .section-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+  .link { color: var(--blue); font-size: 15px; }
+
+  .row { display: flex; align-items: center; gap: 12px; padding: 13px 16px; min-height: 52px; width: 100%; text-align: left; position: relative; }
+  .row + .row::before, .swipe + .swipe::before { content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--sep); }
+  .row .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .row .t { font-size: 16px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge { width: 36px; height: 36px; border-radius: 10px; background: var(--blue-tint); color: var(--blue); display: grid; place-items: center; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .chev { color: var(--label3); flex-shrink: 0; }
+  .right { text-align: right; display: flex; flex-direction: column; gap: 1px; flex-shrink: 0; }
+  .pr { color: var(--green-text); font-size: 12px; font-weight: 600; }
+
+  .search { display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 10px; border-radius: 10px; background: var(--input); }
+  .search input { flex: 1; border: 0; background: none; outline: none; font-size: 17px; min-width: 0; }
+  .search input::placeholder, .field input::placeholder, textarea::placeholder { color: var(--label2); }
+  .seg { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); background: var(--input); border-radius: 9px; padding: 2px; }
+  .seg button { height: 30px; border-radius: 7px; font-size: 13px; font-weight: 500; }
+  .seg button[aria-pressed="true"] { background: var(--seg-on); box-shadow: var(--seg-shadow); font-weight: 600; }
+  .seg.tall button { height: 40px; font-size: 14px; }
+
+  /* Tab bar: a translucent layer that content scrolls under. */
+  nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+             padding: 7px 0 calc(env(safe-area-inset-bottom) + 4px); background: var(--bar);
+             -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border-top: .5px solid var(--sep); }
+  nav.tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #8A8A8E; min-height: 44px; }
+  nav.tabs button[aria-current="page"] { color: var(--blue); }
+
+  /* Pushed detail view */
+  #detail { position: fixed; inset: 0; z-index: 5; background: var(--bg); overflow-y: auto; transform: translateX(100%);
+            transition: transform 420ms cubic-bezier(.32,.72,0,1); }
+  #detail.open { transform: none; }
+  .back { display: flex; align-items: center; gap: 2px; height: 44px; color: var(--blue); margin-left: -8px; font-size: 17px; }
+  .big { font-size: 56px; font-weight: 700; letter-spacing: -.03em; line-height: 1; }
+  .delta { font-size: 15px; font-weight: 600; color: var(--green-text); }
+  .pct { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .pct div { display: flex; justify-content: space-between; padding: 10px 12px; border-radius: 10px; background: var(--input); font-size: 15px; }
+  .pct div span:first-child { color: var(--label2); }
+  .pct div.on { background: var(--blue-tint); outline: 1.5px solid var(--blue); }
+  .pct div.on span:first-child { color: var(--blue); font-weight: 600; }
+  .swipe { position: relative; overflow: hidden; }
+  .swipe .row { background: var(--card); touch-action: pan-y; }
+  .swipe .del { position: absolute; right: 0; top: 0; bottom: 0; width: 88px; background: var(--red); color: #fff; font-weight: 600; font-size: 15px; visibility: hidden; }
+  .swipe.live .del { visibility: visible; }
+  .chip { font-size: 12px; font-weight: 700; padding: 2px 6px; border-radius: 5px; background: var(--green); color: #000; }
+
+  /* Reading */
+  .reading { position: relative; border-radius: 14px; overflow: hidden; height: 220px; background: var(--input); }
+  .reading img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .reading .scan { position: absolute; left: 0; right: 0; height: 40%; background: linear-gradient(to bottom, transparent, var(--blue-tint), transparent);
+                   animation: scan 1.6s ease-in-out infinite alternate; }
+  @keyframes scan { from { top: -40%; } to { top: 100%; } }
+  .bar { height: 4px; border-radius: 2px; background: var(--input); overflow: hidden; }
+  .bar div { height: 100%; background: var(--blue); width: 0; transition: width 300ms ease-out; }
+
+  /* Sheet: spring-driven, dragged by its header. */
+  #scrim { position: fixed; inset: 0; z-index: 20; background: var(--scrim); opacity: 0; }
+  #sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 21; top: calc(env(safe-area-inset-top) + 12px);
+           background: var(--sheet); border-radius: 14px 14px 0 0; display: flex; flex-direction: column; transform: translateY(110%); will-change: transform; }
+  .sheet-head { padding: 6px 16px 8px; touch-action: none; cursor: grab; }
+  .grabber { width: 36px; height: 5px; border-radius: 3px; background: var(--label3); margin: 0 auto 4px; }
+  .sheet-nav { display: flex; justify-content: space-between; align-items: center; }
+  .sheet-nav button { color: var(--blue); min-height: 44px; padding: 0 2px; }
+  .sheet-nav .title { font-weight: 600; }
+  .sheet-body { flex: 1; overflow-y: auto; padding: 0 16px calc(env(safe-area-inset-bottom) + 24px); overscroll-behavior: contain; }
+  .part { background: var(--sheet-card); border-radius: 14px; padding: 14px; margin-top: 12px; display: flex; flex-direction: column; gap: 12px; }
+  .part-top { display: flex; align-items: flex-start; gap: 12px; }
+  .part-top .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+  .title-in { border: 0; background: none; outline: none; font-size: 17px; font-weight: 600; width: 100%; padding: 0; }
+  .presc { border: 0; background: none; outline: none; resize: none; font-size: 14px; line-height: 1.4; color: var(--label2); width: 100%; padding: 0; field-sizing: content; min-height: 20px; }
+  .part.off .body { display: none; }
+  .part.off .title-in { color: var(--label2); }
+  .tag { align-self: flex-start; font-size: 12px; font-weight: 600; padding: 3px 8px; border-radius: 6px; background: var(--blue-tint); color: var(--blue); }
+  .switch { width: 51px; height: 31px; border-radius: 16px; background: var(--switch-off); position: relative; flex-shrink: 0; transition: background 200ms; }
+  .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff;
+                   box-shadow: 0 3px 8px rgba(0,0,0,.15), 0 1px 1px rgba(0,0,0,.16); transition: transform 250ms cubic-bezier(.3,.7,.4,1.1); }
+  .switch[aria-checked="true"] { background: var(--green); }
+  .switch[aria-checked="true"]::after { transform: translateX(20px); }
+  .body { display: flex; flex-direction: column; gap: 10px; }
+  .field { display: flex; align-items: center; gap: 6px; height: 44px; padding: 0 12px; border-radius: 10px; background: var(--input); }
+  .field input { flex: 1; min-width: 0; border: 0; background: none; outline: none; font-size: 17px; font-weight: 500; font-variant-numeric: tabular-nums; }
+  .field .unit { color: var(--label2); font-size: 15px; }
+  .split { display: flex; gap: 8px; align-items: center; }
+  .split .field { flex: 1; min-width: 0; }
+  .split .seg { width: 132px; flex-shrink: 0; }
+  .kind { border: 0; background: none; color: var(--blue); font-size: 13px; font-weight: 500; padding: 0; -webkit-appearance: none; appearance: none; }
+  .notes { border: 0; background: none; outline: none; font-size: 15px; width: 100%; padding: 2px 0; }
+  .notes::placeholder { color: var(--label3); }
+  .date-row { display: flex; justify-content: space-between; align-items: center; background: var(--sheet-card); border-radius: 12px; padding: 0 14px; height: 48px; margin-top: 4px; }
+  .date-row input { border: 0; background: var(--input); border-radius: 8px; padding: 6px 10px; font-size: 15px; }
+  .add { margin-top: 12px; width: 100%; height: 48px; border-radius: 12px; background: var(--sheet-card); color: var(--blue); font-weight: 500; }
+  .danger { margin-top: 12px; width: 100%; height: 48px; border-radius: 12px; background: var(--sheet-card); color: var(--red); font-weight: 500; }
+
+  .toast { position: fixed; left: 50%; top: calc(env(safe-area-inset-top) + 10px); transform: translateX(-50%); z-index: 40;
+           background: var(--card); color: var(--label); padding: 10px 18px; border-radius: 22px; font-size: 15px; font-weight: 500;
+           box-shadow: 0 8px 30px rgba(0,0,0,.18); display: flex; gap: 8px; align-items: center; max-width: calc(100% - 32px); }
+  .toast.err { color: var(--red); }
+
+  @media (prefers-reduced-motion: reduce) {
+    #detail { transition: opacity 200ms; transform: none; opacity: 0; pointer-events: none; }
+    #detail.open { opacity: 1; pointer-events: auto; }
+    .reading .scan { animation: none; display: none; }
+    .press:active { transform: none; }
+  }
+  @media (prefers-reduced-transparency: reduce) { nav.tabs { background: var(--card); -webkit-backdrop-filter: none; backdrop-filter: none; } }
 </style>
 </head>
 <body>
 
-<section id="setup" class="hidden">
-  <header><h1>WOD</h1></header>
-  <div class="panel stack">
-    <p class="label">Access token</p>
-    <input id="tokenIn" class="mono" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="paste token">
-    <button class="primary" id="tokenSave">Save</button>
+<section id="setup" class="view hidden">
+  <h1>WOD</h1>
+  <div class="hero" style="margin-top:20px">
+    <p class="sub">Paste your access code to connect.</p>
+    <div class="field"><input id="tokenIn" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Access code" aria-label="Access code"></div>
+    <button class="btn press" id="tokenSave">Connect</button>
   </div>
 </section>
 
-<section id="log">
-  <header><h1>WOD</h1><span class="label mono" id="today"></span></header>
-  <div id="capture">
-    <label class="panel" style="display:block;padding:0;border:0;background:none">
-      <input id="photo" class="pick hidden" type="file" accept="image/*" capture="environment">
-      <span class="primary big" style="display:block;text-align:center;background:var(--blue);padding:28px 16px;font-size:20px;font-weight:500">Snap the board</span>
-    </label>
-    <div class="row">
-      <label class="grow" style="display:block">
-        <input class="pick hidden" type="file" accept="image/*">
-        <span style="display:block;text-align:center;border:1px solid var(--line);padding:12px 16px">Upload a photo</span>
-      </label>
-      <button id="manual" class="grow">No photo</button>
-    </div>
-    <p class="muted small" id="status" style="margin-top:16px"></p>
+<!-- Today -->
+<main id="v-today" class="view stack">
+  <div>
+    <p class="eyebrow" id="dateLine"></p>
+    <h1>Today</h1>
   </div>
-  <div id="review" class="hidden">
-    <div class="row" style="margin-bottom:12px">
-      <p class="label grow">Your results</p>
-      <input id="day" type="date" class="mono" style="width:auto">
+  <div class="hero" id="hero">
+    <div id="heroIdle" style="display:flex;flex-direction:column;gap:16px">
+      <div class="icon-tile"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
+      <div><h2>Snap the board</h2><p class="sub" style="margin-top:4px">Every section on the whiteboard, read in a couple of seconds.</p></div>
+      <label class="btn press" style="display:grid;place-items:center">Open camera<input class="pick hidden" type="file" accept="image/*" capture="environment"></label>
+      <div class="grid2">
+        <label class="btn2 press"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg>Upload photo<input class="pick hidden" type="file" accept="image/*"></label>
+        <button class="btn2 press" id="manual"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Type it in</button>
+      </div>
     </div>
-    <div id="parts"></div>
-    <button id="addPart" style="width:100%;margin-bottom:12px">Add a part</button>
-    <div class="row">
-      <button id="cancel">Cancel</button>
-      <button id="save" class="primary grow">Save</button>
+    <div id="heroReading" class="hidden" style="display:flex;flex-direction:column;gap:14px">
+      <div class="reading"><img id="readImg" alt="The board photo being read"><div class="scan"></div></div>
+      <div><h2 id="readTitle">Reading the board</h2><p class="sub" id="readSub" style="margin-top:4px">Finding every section…</p></div>
+      <div class="bar"><div id="readBar"></div></div>
     </div>
   </div>
+  <div>
+    <div class="section-head"><h3>Logged today</h3><button class="link" data-go="progress">See all</button></div>
+    <div class="card" id="todayList"></div>
+  </div>
+</main>
+
+<!-- Progress -->
+<main id="v-progress" class="view hidden">
+  <h1>Progress</h1>
+  <label class="search" style="margin-top:14px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="color:var(--label2)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="filter" placeholder="Squat, Fran, thrusters" aria-label="Search"></label>
+  <div class="seg" id="cat" style="margin-top:12px">
+    <button aria-pressed="true" data-cat="all">All</button><button aria-pressed="false" data-cat="lift">Lifts</button><button aria-pressed="false" data-cat="bench">Benchmarks</button><button aria-pressed="false" data-cat="metcon">Metcons</button>
+  </div>
+  <div class="card" id="groups" style="margin-top:14px"></div>
+  <p class="small" style="margin:10px 4px 0">Green means a new record in the last 30 days.</p>
+</main>
+
+<!-- Benchmarks -->
+<main id="v-bench" class="view hidden">
+  <h1>Benchmarks</h1>
+  <p class="sub" style="margin-top:6px">The Girls, Hero WODs and classics. Snap one from the board and it lands here.</p>
+  <div class="card" id="benchDone" style="margin-top:16px"></div>
+  <h3 style="margin:22px 0 8px">Not done yet</h3>
+  <div class="card" id="benchTodo"></div>
+</main>
+
+<!-- Detail (pushed) -->
+<section id="detail" aria-hidden="true">
+  <div class="view" id="detailBody"></div>
 </section>
 
-<section id="history" class="hidden">
-  <header><h1>Progress</h1><span class="label mono" id="count"></span></header>
-  <input id="filter" placeholder="Filter: squat, fran, thrusters..." style="margin-bottom:12px">
-  <div id="groups"></div>
-</section>
-
-<nav>
-  <button data-tab="log" class="on">Log</button>
-  <button data-tab="history">Progress</button>
+<nav class="tabs" id="tabs">
+  <button aria-current="page" data-go="today"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Today</button>
+  <button data-go="progress"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l5-6 4 3 7-9"/><path d="M15 7h5v5"/></svg>Progress</button>
+  <button data-go="bench"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/></svg>Benchmarks</button>
 </nav>
 
-<div id="toast" class="toast hidden"></div>
+<!-- Sheet -->
+<div id="scrim" class="hidden"></div>
+<section id="sheet" class="hidden" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+  <div class="sheet-head" id="sheetHead">
+    <div class="grabber"></div>
+    <div class="sheet-nav">
+      <button id="sheetCancel">Cancel</button>
+      <span class="title" id="sheetTitle">Review</span>
+      <button id="sheetSave" style="font-weight:600">Save</button>
+    </div>
+  </div>
+  <div class="sheet-body" id="sheetBody"></div>
+</section>
+
+<div id="toast" class="toast hidden" role="status"></div>
 
 <template id="partTpl">
-  <div class="panel stack part">
-    <div class="row">
-      <input class="title grow" placeholder="Back Squat / Fran / 21-15-9 ...">
-      <button class="drop" aria-label="Remove part">×</button>
+  <div class="part">
+    <div class="part-top">
+      <div class="grow">
+        <input class="title-in" placeholder="Back Squat, Fran, 21-15-9…" aria-label="Name">
+        <textarea class="presc" rows="1" placeholder="What the board said" aria-label="What the board said"></textarea>
+      </div>
+      <button class="switch" role="switch" aria-checked="true" aria-label="Did it"></button>
     </div>
-    <select class="kind">
-      <option value="strength">Strength (kg)</option>
-      <option value="for_time">For time (mm:ss)</option>
-      <option value="amrap">AMRAP (rounds+reps)</option>
-      <option value="emom">EMOM</option>
-      <option value="other">Other</option>
-    </select>
-    <textarea class="prescription" placeholder="What the board said"></textarea>
-    <div class="row">
-      <input class="score mono grow" inputmode="text" autocomplete="off">
-      <div class="seg"><button class="rx on" type="button">RX</button><button class="sc" type="button">Scaled</button></div>
+    <div class="body">
+      <span class="tag hidden"></span>
+      <div class="seg tall capseg hidden"><button aria-pressed="true" data-cap="0">Finished</button><button aria-pressed="false" data-cap="1">Hit the cap</button></div>
+      <div class="split">
+        <label class="field"><input class="score" autocomplete="off" aria-label="Score"><span class="unit"></span></label>
+        <div class="seg tall rxseg"><button aria-pressed="true" data-rx="1">RX</button><button aria-pressed="false" data-rx="0">Scaled</button></div>
+      </div>
+      <div class="split" style="justify-content:space-between">
+        <input class="notes" placeholder="Add a note" aria-label="Note">
+        <select class="kind" aria-label="Type of workout">
+          <option value="strength">Lift</option><option value="for_time">For time</option><option value="amrap">AMRAP</option><option value="emom">EMOM</option><option value="other">Other</option>
+        </select>
+      </div>
     </div>
-    <input class="notes" placeholder="Notes (optional)">
   </div>
 </template>
 
 <script>
 const API = "https://ktotbpvtkaubecmodgyb.supabase.co/functions/v1/wod";
 const $ = (s, el = document) => el.querySelector(s);
+const $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
   set(k, v) { try { localStorage.setItem(k, v); } catch {} },
 };
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 // Token: from the link (#t=...) the first time, then from storage.
 const hashToken = new URLSearchParams(location.hash.slice(1)).get("t");
 if (hashToken) store.set("wodToken", hashToken);
 let token = store.get("wodToken") || hashToken;
 
-// CrossFit vocabulary (crossfit.json, from andrewcampkin/chalk, MIT): 105 movements with their short forms
-// and 51 named workouts. Used to give one movement one name, so "T2B" and "Toes-to-bar" chart together,
-// and to recognise a benchmark (Fran, Murph...) by its name or by its movements plus rep scheme.
+/* ---------- CrossFit vocabulary (crossfit.json, from andrewcampkin/chalk, MIT) ---------- */
+// 105 movements with short forms and 51 named workouts: one name per movement so "T2B" and
+// "Toes-to-bar" chart together, and benchmarks recognised by name or by movements plus rep scheme.
 let CF = { movements: [], benchmarks: [] }, ALIAS = new Map();
-const key = s => s.toLowerCase().replace(/[^a-z0-9&]+/g, " ").trim();
-const singular = s => s.replace(/(?<=[a-z]{2})(es|s)$/, ""); // "DUs" -> "du", "thrusters" -> "thruster"
-fetch("crossfit.json").then(r => r.json()).then(d => {
+const key = s => String(s || "").toLowerCase().replace(/[^a-z0-9&]+/g, " ").trim();
+const singular = s => s.replace(/(?<=[a-z]{2})(es|s)$/, "");
+const cfReady = fetch("crossfit.json").then(r => r.json()).then(d => {
   CF = d;
-  for (const m of d.movements) for (const a of [m.name, m.slug, ...m.aliases]) {
-    ALIAS.set(key(a), m); ALIAS.set(singular(key(a)), m);
-  }
+  for (const m of d.movements) for (const a of [m.name, m.slug, ...m.aliases]) { ALIAS.set(key(a), m); ALIAS.set(singular(key(a)), m); }
 }).catch(() => {}); // ponytail: without the list the app still works, titles just stay as written
-
 const canonMove = s => ALIAS.get(key(s)) || ALIAS.get(singular(key(s)));
-// Movement slugs mentioned anywhere in a text, longest name first so "power clean" beats "clean".
 function movesIn(text) {
   const t = ` ${key(text)} `, found = new Set();
   [...ALIAS.keys()].filter(a => a.length > 2).sort((a, b) => b.length - a.length).forEach(a => {
@@ -170,111 +312,220 @@ function movesIn(text) {
   return found;
 }
 const SCORE_KIND = { time: "for_time", rounds_reps: "amrap", load: "strength", reps: "other" };
-function findBenchmark(title, prescription) {
+function findBenchmark(title, prescription = "") {
   const byName = CF.benchmarks.find(b => key(title) === key(b.name) || key(title).startsWith(key(b.name) + " "));
   if (byName) return byName;
-  // Scaled options name other movements (ring rows for pull-ups), so read only the RX part.
   const text = `${title} ${prescription}`.split(/scaled/i)[0], moves = movesIn(text), scheme = (text.match(/\d+(?:-\d+)+/) || [])[0];
-  return CF.benchmarks.find(b => scheme && b.prescription.includes(scheme) &&
-    b.movements.length === moves.size && b.movements.every(m => moves.has(m)));
+  return CF.benchmarks.find(b => scheme && b.prescription.includes(scheme) && b.movements.length === moves.size && b.movements.every(m => moves.has(m)));
 }
-// One name per thing: benchmark name if it is one, else each movement piece in its canonical form.
 function normalise(p) {
   const b = findBenchmark(p.title || "", p.prescription || "");
   if (b) return { ...p, title: b.name, kind: SCORE_KIND[b.score] || p.kind, benchmark: b };
-  const title = (p.title || "").split(/\s*\/\s*/).map(x => canonMove(x)?.name || x).join(" / ");
-  return { ...p, title };
+  return { ...p, title: (p.title || "").split(/\s*\/\s*/).map(x => canonMove(x)?.name || x).join(" / ") };
 }
 const groupKey = title => key(normalise({ title }).title);
 
+/* ---------- Scores ---------- */
+// ponytail: a capped for-time result is stored as CAPPED - reps, so it ranks after every finished time
+// (lower is better) and more reps still beats fewer. Breaks only for times over ~27 hours.
+const CAPPED = 100000;
+const isCapped = r => r.kind === "for_time" && r.score_value >= CAPPED - 10000;
+const lowerIsBetter = kind => kind === "for_time";
+function scoreValue(kind, s) {
+  s = (s || "").trim(); if (!s) return null;
+  if (kind === "for_time" && /cap/i.test(s)) return CAPPED - (parseInt(s.replace(/\D+/g, " ").trim()) || 0);
+  if (kind === "for_time" && s.includes(":")) { const p = s.split(":").map(Number); return p.length === 3 ? p[0] * 3600 + p[1] * 60 + p[2] : p[0] * 60 + (p[1] || 0); }
+  if (kind === "amrap" && s.includes("+")) { const [r, reps] = s.split("+").map(Number); return r + (reps || 0) / 1000; }
+  const n = parseFloat(s.replace(",", ".")); return Number.isFinite(n) ? n : null;
+}
+const fmtScore = r => !r.score ? "—" : isCapped(r) ? `Capped · ${CAPPED - r.score_value} reps`
+  : r.kind === "strength" && /^\d+([.,]\d+)?$/.test(r.score) ? `${r.score} kg` : r.score;
+const fmtSecs = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
+const better = (kind, a, b) => lowerIsBetter(kind) ? a < b : a > b;
+
+/* ---------- Helpers ---------- */
 const today = () => new Date().toLocaleDateString("en-CA");
-$("#today").textContent = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+const fmtDay = (d, opts = { day: "numeric", month: "short", year: "numeric" }) => new Date(d + "T12:00").toLocaleDateString("en-GB", opts);
+const daysAgo = d => (Date.now() - new Date(d + "T12:00")) / 864e5;
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const CHEV = `<svg class="chev" width="8" height="14" viewBox="0 0 8 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M1 1l6 6-6 6"/></svg>`;
+const BADGE = { strength: "LIFT", for_time: "FT", amrap: "AMRAP", emom: "EMOM", other: "WOD" };
+$("#dateLine").textContent = new Date().toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" });
 
 function toast(msg, kind = "ok") {
   const t = $("#toast"); t.textContent = msg; t.className = `toast ${kind}`;
-  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 3500);
+  clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600);
 }
-
 async function api(path, opts = {}) {
   const r = await fetch(`${API}/${path}`, { ...opts, headers: { "content-type": "application/json", "x-app-token": token } });
   const body = await r.json().catch(() => ({}));
-  if (r.status === 401) { showSetup(); throw new Error("Token rejected"); }
+  if (r.status === 401) { showSetup(); throw new Error("Access code rejected"); }
   if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
   return body;
 }
 
-function showSetup() { $("#setup").classList.remove("hidden"); $("#log").classList.add("hidden"); $("nav").classList.add("hidden"); }
-$("#tokenSave").onclick = () => {
-  token = $("#tokenIn").value.trim(); if (!token) return;
-  store.set("wodToken", token); $("#setup").classList.add("hidden"); $("#log").classList.remove("hidden"); $("nav").classList.remove("hidden");
-};
-if (!token) showSetup();
-
-// Tabs
-document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
-  document.querySelectorAll("nav button").forEach(x => x.classList.toggle("on", x === b));
-  $("#log").classList.toggle("hidden", b.dataset.tab !== "log");
-  $("#history").classList.toggle("hidden", b.dataset.tab !== "history");
-  if (b.dataset.tab === "history") loadHistory();
-});
-
-// Score: what Paul types, and the one number charts use.
-const PLACEHOLDER = { strength: "Top set, kg", for_time: "8:42 or cap 145", amrap: "Rounds+reps, e.g. 5+12", emom: "Score", other: "Score" };
-// ponytail: a capped result is stored as CAPPED - reps, so it always ranks after every finished time
-// (lower is better) and more reps still beats fewer. Breaks only for times over ~27 hours.
-const CAPPED = 100000;
-const isCapped = r => r.kind === "for_time" && r.score_value >= CAPPED - 10000;
-function scoreValue(kind, s) {
-  s = (s || "").trim(); if (!s) return null;
-  if (kind === "for_time" && /cap/i.test(s)) { const reps = parseInt(s.replace(/\D+/g, " ").trim()); return CAPPED - (reps || 0); }
-  if (kind === "for_time" && s.includes(":")) { const [m, sec] = s.split(":").map(Number); return m * 60 + (sec || 0); }
-  // ponytail: rounds + reps/1000 orders AMRAPs correctly without knowing reps per round
-  if (kind === "amrap" && s.includes("+")) { const [r, reps] = s.split("+").map(Number); return r + (reps || 0) / 1000; }
-  const n = parseFloat(s.replace(",", ".")); return Number.isFinite(n) ? n : null;
+/* ---------- Spring (Apple's damping + response), used by the sheet ---------- */
+// Semi-implicit Euler on a damped spring; starts from the current value and carries velocity, so it can be
+// grabbed and reversed mid-flight. damping 1 = no overshoot (default), < 1 only after a flick.
+function spring(state, to, { velocity = 0, response = 0.35, damping = 1, onUpdate, onDone } = {}) {
+  cancelAnimationFrame(state.raf);
+  if (reduceMotion) { state.value = to; state.v = 0; onUpdate(to); onDone?.(); return; }
+  const k = (2 * Math.PI / response) ** 2, c = 4 * Math.PI * damping / response;
+  let v = velocity, last = performance.now();
+  const step = now => {
+    const dt = Math.min(0.032, (now - last) / 1000); last = now;
+    for (let i = 0; i < 4; i++) { const h = dt / 4; v += (-k * (state.value - to) - c * v) * h; state.value += v * h; }
+    state.v = v; onUpdate(state.value);
+    if (Math.abs(state.value - to) < 0.5 && Math.abs(v) < 8) { state.value = to; state.v = 0; onUpdate(to); onDone?.(); return; }
+    state.raf = requestAnimationFrame(step);
+  };
+  state.raf = requestAnimationFrame(step);
 }
-const lowerIsBetter = kind => kind === "for_time";
+const project = (v, d = 0.998) => (v / 1000) * d / (1 - d); // where a flick would come to rest
+const rubber = (x, dim, c = 0.55) => (x * dim * c) / (dim + c * Math.abs(x));
 
-// Review
-// One part form, used both for a new board and for editing a saved result.
-function makePart(p = {}) {
+/* ---------- Sheet ---------- */
+const sheet = $("#sheet"), scrim = $("#scrim"), sy = { value: 0, raf: 0, v: 0 };
+let sheetH = 800, onSheetSave = null;
+function paintSheet(y) {
+  sheet.style.transform = `translateY(${Math.max(y, -40)}px)`;
+  scrim.style.opacity = String(Math.max(0, Math.min(1, 1 - y / sheetH)));
+}
+function openSheet(title, buildBody, onSave, saveLabel = "Save") {
+  $("#sheetTitle").textContent = title; $("#sheetSave").textContent = saveLabel;
+  $("#sheetBody").innerHTML = ""; buildBody($("#sheetBody")); $("#sheetBody").scrollTop = 0;
+  onSheetSave = onSave;
+  sheet.classList.remove("hidden"); scrim.classList.remove("hidden");
+  sheetH = sheet.offsetHeight; if (!sheet.dataset.open) sy.value = sheetH;
+  sheet.dataset.open = "1"; paintSheet(sy.value);
+  spring(sy, 0, { response: 0.4, onUpdate: paintSheet });
+}
+function closeSheet(velocity = 0) {
+  delete sheet.dataset.open;
+  spring(sy, sheetH, { velocity, response: 0.35, onUpdate: paintSheet, onDone: () => { sheet.classList.add("hidden"); scrim.classList.add("hidden"); } });
+}
+$("#sheetCancel").onclick = () => closeSheet();
+scrim.onclick = () => closeSheet();
+$("#sheetSave").onclick = async () => {
+  if (!onSheetSave) return;
+  $("#sheetSave").disabled = true;
+  try { if (await onSheetSave() !== false) closeSheet(); } finally { $("#sheetSave").disabled = false; }
+};
+// Drag the header: 1:1 tracking from where it was grabbed, rubber-band upward, project the flick on release.
+(() => {
+  let start = null, hist = [];
+  $("#sheetHead").addEventListener("pointerdown", e => {
+    if (e.target.closest("button")) return;
+    cancelAnimationFrame(sy.raf);
+    start = { y: e.clientY, val: sy.value }; hist = [{ y: e.clientY, t: e.timeStamp }];
+    $("#sheetHead").setPointerCapture(e.pointerId);
+  });
+  $("#sheetHead").addEventListener("pointermove", e => {
+    if (!start) return;
+    const raw = start.val + e.clientY - start.y;
+    sy.value = raw < 0 ? rubber(raw, sheetH) : raw; paintSheet(sy.value);
+    hist.push({ y: e.clientY, t: e.timeStamp }); if (hist.length > 5) hist.shift();
+  });
+  const end = () => {
+    if (!start) return; start = null;
+    const a = hist[0], b = hist[hist.length - 1], v = b.t > a.t ? (b.y - a.y) / (b.t - a.t) * 1000 : 0;
+    if (sy.value + project(v) > sheetH * 0.4) closeSheet(v);
+    else spring(sy, 0, { velocity: v, response: 0.3, damping: Math.abs(v) > 300 ? 0.8 : 1, onUpdate: paintSheet });
+  };
+  $("#sheetHead").addEventListener("pointerup", end);
+  $("#sheetHead").addEventListener("pointercancel", end);
+})();
+
+/* ---------- Part form (review and edit) ---------- */
+const PH = { strength: ["Top set", "kg"], for_time: ["Time  mm:ss", ""], amrap: ["Rounds + reps, e.g. 5+12", ""], emom: ["Score", ""], other: ["Score", ""] };
+function setPressed(group, btn) { $$("button", group).forEach(b => b.setAttribute("aria-pressed", String(b === btn))); }
+function makePart(p = {}, { toggle = true } = {}) {
   const el = $("#partTpl").content.firstElementChild.cloneNode(true);
-  $(".title", el).value = p.title || "";
-  if (p.benchmark) {
-    const tag = document.createElement("p"); tag.className = "label pr";
-    tag.textContent = `Benchmark · standard: ${p.benchmark.prescription}`;
-    $(".prescription", el).before(tag);
-  }
-  $(".kind", el).value = p.kind || "other";
-  $(".prescription", el).value = p.prescription || "";
-  $(".score", el).value = p.score || "";
+  const kindSel = $(".kind", el), score = $(".score", el), capseg = $(".capseg", el), sw = $(".switch", el);
+  $(".title-in", el).value = p.title || "";
+  $(".presc", el).value = p.prescription || "";
   $(".notes", el).value = p.notes || "";
-  const setRx = rx => { $(".rx", el).classList.toggle("on", rx); $(".sc", el).classList.toggle("on", !rx); };
-  setRx(p.rx !== false);
-  const setPh = () => $(".score", el).placeholder = PLACEHOLDER[$(".kind", el).value];
-  $(".kind", el).onchange = setPh; setPh();
-  $(".rx", el).onclick = () => setRx(true);
-  $(".sc", el).onclick = () => setRx(false);
-  $(".drop", el).onclick = () => el.remove();
+  kindSel.value = p.kind || "other";
+  if (p.benchmark) { const t = $(".tag", el); t.textContent = `Benchmark · ${p.benchmark.prescription}`; t.classList.remove("hidden"); }
+  let capped = /cap/i.test(p.score || "");
+  score.value = capped ? (p.score.match(/\d+/) || [""])[0] : (p.score || "");
+  const paint = () => {
+    const k = kindSel.value; capseg.classList.toggle("hidden", k !== "for_time");
+    const isCap = k === "for_time" && capped;
+    score.placeholder = isCap ? "Reps when the clock ran out" : PH[k][0];
+    $(".unit", el).textContent = isCap ? "reps" : PH[k][1];
+    score.inputMode = k === "strength" ? "decimal" : isCap || k === "emom" ? "numeric" : "text";
+  };
+  setPressed(capseg, $(`[data-cap="${capped ? 1 : 0}"]`, capseg));
+  capseg.onclick = e => { const b = e.target.closest("button"); if (!b) return; capped = b.dataset.cap === "1"; setPressed(capseg, b); paint(); };
+  const rxseg = $(".rxseg", el);
+  setPressed(rxseg, $(`[data-rx="${p.rx === false ? 0 : 1}"]`, rxseg));
+  rxseg.onclick = e => { const b = e.target.closest("button"); if (b) setPressed(rxseg, b); };
+  kindSel.onchange = paint; paint();
+  if (!toggle) sw.remove();
+  else sw.onclick = () => { const on = sw.getAttribute("aria-checked") !== "true"; sw.setAttribute("aria-checked", String(on)); el.classList.toggle("off", !on); };
+  if (p.off) { sw.setAttribute("aria-checked", "false"); el.classList.add("off"); }
+  el.read = day => {
+    const kind = kindSel.value, raw = score.value.trim();
+    const s = !raw ? null : kind === "for_time" && capped ? `cap ${raw.replace(/\D/g, "")}` : raw;
+    return { day, kind, title: $(".title-in", el).value.trim(), prescription: $(".presc", el).value.trim() || null,
+             score: s, score_value: scoreValue(kind, s), rx: $('.rxseg [aria-pressed="true"]', el).dataset.rx === "1",
+             notes: $(".notes", el).value.trim() || null };
+  };
+  el.isOn = () => !sw.isConnected || sw.getAttribute("aria-checked") === "true";
   return el;
 }
-function readPart(el, day) {
-  const kind = $(".kind", el).value, score = $(".score", el).value.trim();
-  return { day, kind, title: $(".title", el).value.trim(), prescription: $(".prescription", el).value.trim() || null,
-           score: score || null, score_value: scoreValue(kind, score), rx: $(".rx", el).classList.contains("on"),
-           notes: $(".notes", el).value.trim() || null };
+function dateRow(value) {
+  const d = document.createElement("label"); d.className = "date-row";
+  d.innerHTML = `<span>Date</span><input type="date" value="${esc(value)}">`;
+  return d;
 }
-const addPart = p => $("#parts").append(makePart(p));
-function openReview(parts) {
-  $("#parts").innerHTML = ""; parts.map(normalise).forEach(addPart);
-  $("#day").value = today();
-  $("#capture").classList.add("hidden"); $("#review").classList.remove("hidden");
-}
-function closeReview() { $("#review").classList.add("hidden"); $("#capture").classList.remove("hidden"); $("#status").textContent = ""; }
-$("#addPart").onclick = () => addPart();
-$("#manual").onclick = () => openReview([{}]);
-$("#cancel").onclick = closeReview;
 
-// Photo: shrink on the phone first (a 12 MP shot is ~4 MB; 1280 px JPEG read the test board exactly).
+/* ---------- Review a board ---------- */
+async function openReview(parts) {
+  await cfReady;
+  const day = new Date();
+  openSheet(`${day.toLocaleDateString("en-GB", { weekday: "long" })}’s board`, body => {
+    body.append(dateRow(today()));
+    const hint = document.createElement("p"); hint.className = "small"; hint.style.margin = "10px 4px 0";
+    hint.textContent = "Switch off what you skipped. Tap any text to fix it."; body.append(hint);
+    parts.map(normalise).forEach(p => body.append(makePart({ ...p, off: /warm/i.test(p.title) })));
+    const add = document.createElement("button"); add.className = "add press"; add.textContent = "Add a part";
+    add.onclick = () => add.before(makePart({}));
+    body.append(add);
+  }, async () => {
+    const day = $("#sheetBody .date-row input").value || today();
+    const results = $$("#sheetBody .part").filter(el => el.isOn()).map(el => el.read(day)).filter(r => r.title);
+    if (!results.length) { toast("Switch on at least one part", "err"); return false; }
+    try { await api("save", { method: "POST", body: JSON.stringify({ results }) }); }
+    catch (err) { toast(`Not saved: ${err.message}`, "err"); return false; }
+    toast(`Saved ${results.length} part${results.length > 1 ? "s" : ""}`);
+    await load();
+  });
+}
+$("#manual").onclick = () => openReview([{}]);
+
+/* ---------- Edit one saved result ---------- */
+function openEdit(r) {
+  openSheet("Edit result", body => {
+    body.append(dateRow(r.day));
+    body.append(makePart(r, { toggle: false }));
+    const del = document.createElement("button"); del.className = "danger press"; del.textContent = "Delete result";
+    del.onclick = async () => {
+      if (del.dataset.armed !== "1") { del.dataset.armed = "1"; del.textContent = "Tap again to delete"; return; }
+      try { await api(`delete?id=${r.id}`, { method: "DELETE" }); closeSheet(); toast("Deleted"); await load(); } catch (e) { toast(e.message, "err"); }
+    };
+    body.append(del);
+  }, async () => {
+    const upd = $("#sheetBody .part").read($("#sheetBody .date-row input").value || r.day);
+    if (!upd.title) { toast("Give it a name", "err"); return false; }
+    try { await api(`update?id=${r.id}`, { method: "PATCH", body: JSON.stringify(upd) }); }
+    catch (e) { toast(`Not saved: ${e.message}`, "err"); return false; }
+    toast("Updated"); await load();
+  });
+}
+
+/* ---------- Reading a photo ---------- */
 function shrink(file) {
   return new Promise((ok, fail) => {
     const img = new Image();
@@ -288,112 +539,210 @@ function shrink(file) {
     img.src = URL.createObjectURL(file);
   });
 }
-// Camera (capture) and library upload share one handler.
-document.querySelectorAll(".pick").forEach(i => i.onchange = readBoard);
-async function readBoard(e) {
+$$(".pick").forEach(i => i.onchange = async e => {
   const file = e.target.files[0]; e.target.value = ""; if (!file) return;
   const t0 = Date.now();
-  const tick = () => $("#status").innerHTML = `<span class="spin"></span>Reading the board... ${Math.round((Date.now() - t0) / 1000)}s`;
-  tick(); const timer = setInterval(tick, 1000);
+  $("#heroIdle").classList.add("hidden"); $("#heroReading").classList.remove("hidden");
+  $("#readTitle").textContent = "Reading the board"; $("#readBar").style.width = "8%";
+  const tick = setInterval(() => {
+    const s = (Date.now() - t0) / 1000;
+    $("#readSub").textContent = `Finding every section… ${Math.round(s)}s`;
+    $("#readBar").style.width = `${Math.min(92, 8 + s * 30)}%`; // ponytail: eased guess; the API doesn't stream progress
+  }, 250);
+  const reset = () => { clearInterval(tick); $("#heroReading").classList.add("hidden"); $("#heroIdle").classList.remove("hidden"); };
   try {
-    const { parts } = await api("parse", { method: "POST", body: JSON.stringify({ image: await shrink(file) }) });
-    openReview(parts);
-  } catch (err) {
-    $("#status").textContent = `Could not read it: ${err.message}. Try again or log without a photo.`;
-  } finally { clearInterval(timer); }
-}
+    const image = await shrink(file); $("#readImg").src = image;
+    const { parts } = await api("parse", { method: "POST", body: JSON.stringify({ image }) });
+    $("#readBar").style.width = "100%"; $("#readTitle").textContent = `Found ${parts.length} section${parts.length > 1 ? "s" : ""}`;
+    setTimeout(() => { reset(); openReview(parts); }, reduceMotion ? 0 : 350);
+  } catch (err) { reset(); toast(`Couldn’t read it: ${err.message}`, "err"); }
+});
 
-$("#save").onclick = async () => {
-  const day = $("#day").value || today();
-  const results = [...document.querySelectorAll("#parts .part")].map(el => readPart(el, day)).filter(r => r.title);
-  if (!results.length) return toast("Give each part a name", "err");
-  $("#save").disabled = true;
-  try { await api("save", { method: "POST", body: JSON.stringify({ results }) }); toast(`Saved ${results.length} part${results.length > 1 ? "s" : ""}`); closeReview(); }
-  catch (err) { toast(`Not saved: ${err.message}`, "err"); }
-  finally { $("#save").disabled = false; }
-};
-
-// History: grouped by title, best result, a sparkline of every scored entry.
-let rows = [];
-const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
-const fmtDay = d => new Date(d + "T12:00").toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "2-digit" });
-
-function spark(points, lower) {
-  if (points.length < 2) return "";
-  const vs = points.map(p => p.score_value), min = Math.min(...vs), max = Math.max(...vs), span = max - min || 1;
-  const xy = points.map((p, i) => {
-    const x = (i / (points.length - 1)) * 296 + 2, t = (p.score_value - min) / span;
-    return [x, 4 + 40 * (lower ? t : 1 - t)];
-  });
-  return `<svg class="spark" viewBox="0 0 300 48" preserveAspectRatio="none" aria-hidden="true">
-    <polyline points="${xy.map(p => p.join(",")).join(" ")}" fill="none" stroke="#1961ed" stroke-width="2" vector-effect="non-scaling-stroke"/>
-    ${xy.map(([x, y]) => `<rect x="${x - 2}" y="${y - 2}" width="4" height="4" fill="#f4f4f4"/>`).join("")}</svg>`;
-}
-
-function renderHistory() {
-  const q = $("#filter").value.trim().toLowerCase();
-  const groups = new Map();
+/* ---------- Data and grouping ---------- */
+let rows = [], groups = [];
+function category(g) { return g.bench ? "bench" : g.kind === "strength" ? "lift" : "metcon"; }
+function buildGroups() {
+  const m = new Map();
   for (const r of rows) {
-    if (q && !(r.title + " " + (r.prescription || "")).toLowerCase().includes(q)) continue;
     const k = groupKey(r.title);
-    if (!groups.has(k)) groups.set(k, []);
-    groups.get(k).push(r);
+    if (!m.has(k)) m.set(k, { key: k, title: normalise({ title: r.title }).title, kind: r.kind, list: [] });
+    m.get(k).list.push(r);
   }
-  $("#count").textContent = `${rows.length} logged`;
-  $("#groups").innerHTML = [...groups.values()].map(list => {
-    const lower = lowerIsBetter(list[0].kind);
-    // RX and Scaled each keep their own PR.
-    const bestOf = rx => list.filter(r => r.score_value != null && r.rx === rx)
-      .reduce((b, r) => !b || (lower ? r.score_value < b.score_value : r.score_value > b.score_value) ? r : b, null);
-    const bestRx = bestOf(true), bestSc = bestOf(false);
-    const prLine = (label, b) => b ? `<p class="mono small pr">PR ${label} ${esc(b.score)} · ${fmtDay(b.day)}</p>` : "";
-    // Chart only like with like: RX if there is any, and only finished times (a capped score is not a time).
-    const chartRx = list.some(r => r.rx && r.score_value != null);
-    const chrono = list.filter(r => r.score_value != null && r.rx === chartRx && !isCapped(r)).slice().reverse();
-    const title = normalise({ title: list[0].title }).title;
-    return `<div class="panel">
-      <div class="hist-head"><h2>${esc(title)}</h2><span class="label">${list.length}×</span></div>
-      ${prLine("RX", bestRx)}${prLine("Scaled", bestSc)}
-      ${spark(chrono, lower)}
-      ${list.map(r => `<div class="entry" data-edit="${r.id}" style="cursor:pointer"><span class="mono muted">${fmtDay(r.day)}</span>
-        <span class="mono">${esc(r.score || "-")}${r.rx ? "" : " <span class='muted'>sc</span>"}${r === bestRx || r === bestSc ? " <span class='pr'>PR</span>" : ""}</span>
-        <span class="small muted">edit</span></div>
-        ${r.notes ? `<p class="muted small">${esc(r.notes)}</p>` : ""}`).join("")}
+  groups = [...m.values()].map(g => {
+    g.bench = CF.benchmarks.find(b => key(b.name) === g.key);
+    const best = rx => g.list.filter(r => r.score_value != null && r.rx === rx).reduce((b, r) => !b || better(g.kind, r.score_value, b.score_value) ? r : b, null);
+    g.bestRx = best(true); g.bestSc = best(false); g.last = g.list[0];
+    return g;
+  });
+}
+async function load() {
+  try { rows = await api("list"); } catch (e) { toast(e.message, "err"); return; }
+  await cfReady; buildGroups(); renderToday(); renderProgress(); renderBench();
+  if (openGroupKey) renderDetail(openGroupKey);
+}
+
+function spark(list, kind) {
+  const pts = list.filter(r => r.score_value != null && !isCapped(r)).slice().reverse();
+  if (pts.length < 2) return `<svg width="64" height="28" aria-hidden="true"></svg>`;
+  const vs = pts.map(p => p.score_value), lo = Math.min(...vs), hi = Math.max(...vs), span = hi - lo || 1;
+  const xy = pts.map((p, i) => [2 + i * 60 / (pts.length - 1), 4 + 20 * (lowerIsBetter(kind) ? (p.score_value - lo) / span : 1 - (p.score_value - lo) / span)]);
+  const [lx, ly] = xy[xy.length - 1];
+  return `<svg width="64" height="28" viewBox="0 0 64 28" aria-hidden="true"><polyline points="${xy.map(p => p.join(",")).join(" ")}" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><circle cx="${lx}" cy="${ly}" r="3" fill="var(--blue)"/></svg>`;
+}
+
+function renderToday() {
+  const list = rows.filter(r => r.day === today());
+  $("#todayList").innerHTML = list.length ? list.map(r => `<button class="row press" data-open="${esc(groupKey(r.title))}">
+      <span class="badge">${BADGE[r.kind] || "WOD"}</span>
+      <span class="grow"><span class="t">${esc(normalise({ title: r.title }).title)}</span><span class="small">${esc(r.score ? fmtScore(r) + (r.rx ? " · RX" : " · Scaled") : "No score yet")}</span></span>${CHEV}</button>`).join("")
+    : `<div class="row"><span class="small">Nothing yet. Snap today’s board after class.</span></div>`;
+}
+
+let cat = "all";
+function renderProgress() {
+  const q = key($("#filter").value);
+  const shown = groups.filter(g => (cat === "all" || category(g) === cat) && (!q || key(g.title + " " + g.list.map(r => r.prescription).join(" ")).includes(q)));
+  $("#groups").innerHTML = shown.length ? shown.map(g => {
+    const b = g.bestRx || g.bestSc, fresh = b && daysAgo(b.day) <= 30;
+    const sub = category(g) === "bench" ? `Benchmark · ${g.list.length} attempt${g.list.length > 1 ? "s" : ""}` : category(g) === "lift" ? `Lift · ${g.list.length} session${g.list.length > 1 ? "s" : ""}` : `${g.list.length} time${g.list.length > 1 ? "s" : ""}`;
+    return `<button class="row press" data-open="${esc(g.key)}">
+      <span class="grow"><span class="t" style="font-size:17px">${esc(g.title)}</span><span class="small">${sub}</span></span>
+      ${spark(g.list.filter(r => r.rx === (g.bestRx ? true : false)), g.kind)}
+      <span class="right" style="min-width:72px"><span class="num" style="font-weight:600">${b ? esc(fmtScore(b)) : "—"}</span>${b ? `<span class="${fresh ? "pr" : "small"}" style="font-size:12px">${fresh ? "PR" : "best"}</span>` : ""}</span>
+    </button>`;
+  }).join("") : `<div class="row"><span class="small">${rows.length ? "Nothing matches." : "Nothing logged yet."}</span></div>`;
+}
+$("#filter").oninput = renderProgress;
+$("#cat").onclick = e => { const b = e.target.closest("button"); if (!b) return; cat = b.dataset.cat; setPressed($("#cat"), b); renderProgress(); };
+
+function renderBench() {
+  const done = groups.filter(g => g.bench), doneKeys = new Set(done.map(g => g.key));
+  $("#benchDone").innerHTML = done.length ? done.map(g => { const b = g.bestRx || g.bestSc; return `<button class="row press" data-open="${esc(g.key)}">
+      <span class="grow"><span class="t">${esc(g.title)}</span><span class="small">${g.list.length}× · ${esc(g.bench.prescription)}</span></span>
+      <span class="right"><span class="num" style="font-weight:600">${b ? esc(fmtScore(b)) : "—"}</span></span>${CHEV}</button>`; }).join("")
+    : `<div class="row"><span class="small">None logged yet.</span></div>`;
+  $("#benchTodo").innerHTML = CF.benchmarks.filter(b => !doneKeys.has(key(b.name))).map(b => `<div class="row">
+      <span class="grow"><span class="t">${esc(b.name)}</span><span class="small" style="white-space:normal">${esc(b.prescription)}</span></span></div>`).join("");
+}
+
+/* ---------- Detail ---------- */
+let openGroupKey = null, detailRx = true;
+function chart(list, kind) {
+  const pts = list.filter(r => r.score_value != null && !isCapped(r)).slice().reverse();
+  if (pts.length < 2) return "";
+  const W = 322, H = 120, vs = pts.map(p => p.score_value), lo = Math.min(...vs), hi = Math.max(...vs), span = hi - lo || 1;
+  const xy = pts.map((p, i) => [16 + i * (W - 32) / (pts.length - 1), 14 + 76 * (lowerIsBetter(kind) ? (p.score_value - lo) / span : 1 - (p.score_value - lo) / span)]);
+  const lab = (i, a) => `<text x="${xy[i][0]}" y="${H - 4}" fill="var(--label2)" font-size="11" text-anchor="${a}">${fmtDay(pts[i].day, { day: "numeric", month: "short" })}</text>`;
+  return `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Scores over time">
+    <line x1="0" y1="100" x2="${W}" y2="100" stroke="var(--sep)"/>
+    <polyline points="${xy.map(p => p.join(",")).join(" ")}" fill="none" stroke="var(--blue)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+    ${xy.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i === xy.length - 1 ? 6 : 4.5}" fill="${i === xy.length - 1 ? "var(--blue)" : "var(--card)"}" stroke="var(--blue)" stroke-width="2.5"/>`).join("")}
+    ${lab(0, "start")}${lab(xy.length - 1, "end")}</svg>`;
+}
+function renderDetail(k) {
+  const g = groups.find(x => x.key === k); if (!g) return closeDetail();
+  const hasRx = g.list.some(r => r.rx), hasSc = g.list.some(r => !r.rx);
+  if (!(detailRx ? hasRx : hasSc)) detailRx = hasRx;
+  const list = g.list.filter(r => r.rx === detailRx), best = detailRx ? g.bestRx : g.bestSc;
+  const scored = list.filter(r => r.score_value != null);
+  let delta = "";
+  if (scored.length >= 2) {
+    const [a, b] = scored, n = scored.length;
+    if (g.kind === "for_time" && !isCapped(a) && !isCapped(b)) {
+      const d = b.score_value - a.score_value;
+      delta = d > 0 ? `${n}th attempt, ${d < 60 ? d + " seconds" : fmtSecs(d)} faster than last time.` : d < 0 ? `${n}th attempt, ${fmtSecs(-d)} slower than last time.` : `${n}th attempt, same as last time.`;
+    } else if (g.kind === "strength") {
+      const d = a.score_value - b.score_value; delta = d ? `${d > 0 ? "+" : "−"}${Math.abs(d)} kg on last time.` : "Same weight as last time.";
+    } else delta = `${n} attempts logged.`;
+    delta = delta.replace(/^1th|^2th|^3th/, m => ({ "1th": "1st", "2th": "2nd", "3th": "3rd" }[m]));
+  }
+  const presc = g.bench ? g.bench.prescription : g.last.prescription || "";
+  let pct = "";
+  if (g.kind === "strength" && best) {
+    const base = best.score_value, want = (presc.match(/@\s*(\d{2})\s*%/) || [])[1];
+    const round = x => Math.round(x / 2.5) * 2.5;
+    pct = `<div class="hero" style="gap:12px"><div class="section-head" style="margin:0"><h3 style="font-size:17px;font-weight:600">Percentages</h3><span class="small">of ${esc(fmtScore(best))}</span></div>
+      <div class="pct">${[60, 65, 70, 75, 80, 85, 90, 95].map(p => `<div class="${String(p) === want ? "on" : ""}"><span>${p}%</span><span class="num" style="font-weight:600">${round(base * p / 100)} kg</span></div>`).join("")}</div>
+      <p class="small">Based on your best top set, rounded to 2.5 kg.${want ? ` The last board said ${want}%, so that row is lit.` : ""}</p></div>`;
+  }
+  $("#detailBody").innerHTML = `
+    <button class="back" id="back"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back</button>
+    <div class="stack" style="margin-top:6px">
+      <div><h1>${esc(g.title)}</h1>${presc ? `<p class="sub" style="margin-top:4px">${esc(presc)}</p>` : ""}</div>
+      ${hasRx && hasSc ? `<div class="seg" id="rxPick"><button aria-pressed="${detailRx}" data-rx="1">RX</button><button aria-pressed="${!detailRx}" data-rx="0">Scaled</button></div>` : ""}
+      ${best ? `<div class="hero" style="gap:12px">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end">
+          <div><p class="eyebrow" style="color:var(--green-text)">Personal record${detailRx ? "" : " · Scaled"}</p><p class="big num" style="margin-top:4px">${esc(isCapped(best) ? "Cap" : best.kind === "strength" ? best.score.replace(/\s*kg$/i, "") : best.score)}</p></div>
+          <span class="small">${fmtDay(best.day)}</span></div>
+        ${delta ? `<p class="sub" style="color:var(--label)">${esc(delta)}</p>` : ""}
+        ${chart(list, g.kind)}</div>` : ""}
+      ${pct}
+      <div><h3 style="margin-bottom:8px">${g.kind === "strength" ? "Sessions" : "Attempts"}</h3>
+        <div class="card">${list.map(r => `<div class="swipe"><button class="del" data-del="${r.id}">Delete</button>
+          <button class="row" data-edit="${r.id}"><span class="grow"><span>${fmtDay(r.day)}</span>${r.notes ? `<span class="small">${esc(r.notes)}</span>` : ""}</span>
+            <span class="num" style="font-weight:600;${isCapped(r) ? "color:var(--label2);font-weight:400" : ""}">${esc(fmtScore(r))}</span>${r === best ? `<span class="chip">PR</span>` : ""}</button></div>`).join("")}</div>
+        <p class="small" style="margin:8px 4px 0">Swipe left to delete, tap to edit.</p></div>
     </div>`;
-  }).join("") || `<p class="muted">Nothing logged yet.</p>`;
+  $("#back").onclick = closeDetail;
+  $("#rxPick")?.addEventListener("click", e => { const b = e.target.closest("button"); if (b) { detailRx = b.dataset.rx === "1"; renderDetail(k); } });
 }
-$("#filter").oninput = renderHistory;
-// Tap a saved result to edit it in place: the same form as a new board, plus its date and Delete.
-$("#groups").onclick = e => {
-  const entry = e.target.closest("[data-edit]"); if (!entry) return;
-  const r = rows.find(x => x.id === entry.dataset.edit); if (!r) return;
-  document.querySelector("#groups .editor")?.remove();
-  const box = document.createElement("div"); box.className = "editor";
-  const part = makePart(r); $(".drop", part).remove();
-  box.innerHTML = `<div class="row" style="margin:8px 0"><input type="date" class="mono day" value="${r.day}"></div>`;
-  box.append(part);
-  const bar = document.createElement("div"); bar.className = "row"; bar.style.marginBottom = "8px";
-  bar.innerHTML = `<button class="del">Delete</button><button class="cancel">Cancel</button><button class="primary grow ok">Save</button>`;
-  box.append(bar);
-  entry.after(box);
-  $(".cancel", bar).onclick = () => box.remove();
-  $(".ok", bar).onclick = async () => {
-    const upd = readPart(part, $(".day", box).value || r.day);
-    if (!upd.title) return toast("Give it a name", "err");
-    try { const [saved] = await api(`update?id=${r.id}`, { method: "PATCH", body: JSON.stringify(upd) });
-          Object.assign(r, saved); renderHistory(); toast("Updated"); }
-    catch (err) { toast(`Not saved: ${err.message}`, "err"); }
+function openDetail(k) {
+  openGroupKey = k; detailRx = true; renderDetail(k);
+  $("#detail").scrollTop = 0; $("#detail").classList.add("open"); $("#detail").setAttribute("aria-hidden", "false");
+}
+function closeDetail() { openGroupKey = null; $("#detail").classList.remove("open"); $("#detail").setAttribute("aria-hidden", "true"); }
+document.addEventListener("click", e => { const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open); });
+
+// Swipe-to-delete on attempt rows: 10 px before committing to horizontal, then 1:1, then snap open or shut.
+(() => {
+  let drag = null;
+  $("#detail").addEventListener("pointerdown", e => {
+    const row = e.target.closest(".swipe .row"); if (!row) return;
+    $$(".swipe .row.opened").forEach(r => { if (r !== row) { r.style.transform = ""; r.classList.remove("opened"); setTimeout(() => r.parentElement?.classList.remove("live"), 300); } });
+    drag = { row, x: e.clientX, y: e.clientY, base: row.classList.contains("opened") ? -88 : 0, horiz: null, hist: [{ x: e.clientX, t: e.timeStamp }] };
+  });
+  $("#detail").addEventListener("pointermove", e => {
+    if (!drag) return;
+    const dx = e.clientX - drag.x, dy = e.clientY - drag.y;
+    if (drag.horiz === null && Math.hypot(dx, dy) > 10) { drag.horiz = Math.abs(dx) > Math.abs(dy); if (drag.horiz) { drag.row.setPointerCapture(e.pointerId); drag.row.parentElement.classList.add("live"); } }
+    if (!drag.horiz) return;
+    let x = drag.base + dx; if (x > 0) x = rubber(x, 88); if (x < -88) x = -88 + rubber(x + 88, 88);
+    drag.row.style.transition = "none"; drag.row.style.transform = `translateX(${x}px)`; drag.x2 = x;
+    drag.hist.push({ x: e.clientX, t: e.timeStamp }); if (drag.hist.length > 5) drag.hist.shift();
+  });
+  const end = () => {
+    if (!drag) return; const d = drag; drag = null;
+    if (!d.horiz) { if (d.horiz === null && !d.row.classList.contains("opened")) { const r = rows.find(x => x.id === d.row.dataset.edit); if (r) openEdit(r); } else if (d.row.classList.contains("opened")) { d.row.style.transform = ""; d.row.classList.remove("opened"); } return; }
+    const a = d.hist[0], b = d.hist[d.hist.length - 1], v = b.t > a.t ? (b.x - a.x) / (b.t - a.t) * 1000 : 0;
+    const open = (d.x2 ?? 0) + project(v, 0.99) < -44;
+    d.row.style.transition = reduceMotion ? "none" : "transform 300ms cubic-bezier(.32,.72,0,1)";
+    d.row.style.transform = open ? "translateX(-88px)" : ""; d.row.classList.toggle("opened", open);
+    if (!open) setTimeout(() => d.row.classList.contains("opened") || d.row.parentElement.classList.remove("live"), 300);
   };
-  $(".del", bar).onclick = async ev => {
-    const b = ev.target;
-    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Sure?"; b.style.color = "var(--bad)"; return; }
-    try { await api(`delete?id=${r.id}`, { method: "DELETE" }); rows = rows.filter(x => x.id !== r.id); renderHistory(); toast("Deleted"); }
-    catch (err) { toast(err.message, "err"); }
-  };
+  $("#detail").addEventListener("pointerup", end);
+  $("#detail").addEventListener("pointercancel", () => { drag = null; });
+  $("#detail").addEventListener("click", async e => {
+    const del = e.target.closest("[data-del]"); if (!del) return;
+    try { await api(`delete?id=${del.dataset.del}`, { method: "DELETE" }); toast("Deleted"); await load(); } catch (err) { toast(err.message, "err"); }
+  });
+})();
+
+/* ---------- Tabs ---------- */
+function go(tab) {
+  closeDetail();
+  for (const t of ["today", "progress", "bench"]) $(`#v-${t}`).classList.toggle("hidden", t !== tab);
+  $$("#tabs button").forEach(b => b.dataset.go === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  scrollTo(0, 0);
+}
+document.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); });
+
+/* ---------- Setup ---------- */
+function showSetup() { $("#setup").classList.remove("hidden"); for (const id of ["v-today", "v-progress", "v-bench", "tabs"]) $("#" + id).classList.add("hidden"); }
+$("#tokenSave").onclick = () => {
+  token = $("#tokenIn").value.trim(); if (!token) return;
+  store.set("wodToken", token); $("#setup").classList.add("hidden"); $("#v-today").classList.remove("hidden"); $("#tabs").classList.remove("hidden"); load();
 };
-async function loadHistory() {
-  try { rows = await api("list"); renderHistory(); } catch (err) { toast(err.message, "err"); }
-}
+if (!token) showSetup(); else load();
 </script>
 </body>
 </html>
