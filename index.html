@@ -14,6 +14,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script type="module">import { rank } from "./rank.mjs"; window.rank = rank;</script>
 <style>
   /* Apple's system colours, light and dark, following the phone. Blue = anything you can tap and charts,
      green = records and switches, red = delete only, grays for everything else. */
@@ -211,6 +212,10 @@
   <div>
     <div class="section-head"><h3>Logged today</h3><button class="link" data-go="progress">See all</button></div>
     <div class="card" id="todayList"></div>
+  </div>
+  <div id="teamTodayWrap" class="hidden">
+    <div class="section-head"><h3>Team today</h3></div>
+    <div class="card" id="teamToday"></div>
   </div>
 </main>
 
@@ -585,10 +590,37 @@ function buildGroups() {
     return g;
   });
 }
+let teamRows = []; // every result you are allowed to see, each with owner_name
 async function load() {
-  try { rows = await api("list"); } catch (e) { toast(e.message, "err"); return; }
-  await cfReady; buildGroups(); renderToday(); renderProgress(); renderBench();
+  try { [rows, teamRows] = await Promise.all([api("list?scope=mine"), api("list?scope=team")]); } catch (e) { toast(e.message, "err"); return; }
+  await cfReady; buildGroups(); renderToday(); renderTeamToday(); renderProgress(); renderBench();
   if (openGroupKey) renderDetail(openGroupKey);
+}
+
+/* ---------- Team today and the team board ---------- */
+function renderTeamToday() {
+  const m = new Map();
+  for (const r of teamRows.filter(r => r.day === today())) {
+    const k = groupKey(r.title);
+    if (!m.has(k)) m.set(k, { key: k, title: normalise({ title: r.title }).title, kind: r.kind, people: new Set() });
+    m.get(k).people.add(r.owner_name || "?");
+  }
+  const list = [...m.values()].filter(g => [...g.people].some(p => p !== me?.name) || g.people.size > 1);
+  $("#teamTodayWrap").classList.toggle("hidden", !list.length);
+  $("#teamToday").innerHTML = list.map(g => `<button class="row press" data-open="${esc(g.key)}" data-day="${today()}">
+      <span class="badge">${BADGE[g.kind] || "WOD"}</span>
+      <span class="grow"><span class="t">${esc(g.title)}</span><span class="small">${esc([...g.people].join(", "))}</span></span>${CHEV}</button>`).join("");
+}
+function teamBoard(k, day) {
+  const entries = teamRows.filter(r => r.day === day && groupKey(r.title) === k);
+  if (!entries.length) return "";
+  const ranked = window.rank ? window.rank(entries) : entries.map(e => ({ ...e, place: null }));
+  return `<div><div class="section-head"><h3>Team board</h3><span class="small">${fmtDay(day, { day: "numeric", month: "short" })}</span></div>
+    <div class="card">${ranked.map(e => `<div class="row" style="${e.user_id === me?.user_id ? "font-weight:600" : ""}">
+      <span class="num" style="width:22px;color:var(--label2)">${e.place ?? "–"}</span>
+      <span class="grow"><span class="t" style="font-weight:inherit">${esc(e.owner_name || "?")}</span></span>
+      <span class="num" style="${e.capped ? "color:var(--label2)" : ""}">${esc(fmtScore(e))}</span>
+      <span class="small" style="width:44px;text-align:right">${e.rx ? "RX" : "Scaled"}</span></div>`).join("")}</div></div>`;
 }
 
 function spark(list, kind) {
@@ -649,8 +681,15 @@ function chart(list, kind) {
     ${xy.map(([x, y], i) => `<circle cx="${x}" cy="${y}" r="${i === xy.length - 1 ? 6 : 4.5}" fill="${i === xy.length - 1 ? "var(--blue)" : "var(--card)"}" stroke="var(--blue)" stroke-width="2.5"/>`).join("")}
     ${lab(0, "start")}${lab(xy.length - 1, "end")}</svg>`;
 }
+const BACK = `<button class="back" id="back"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back</button>`;
 function renderDetail(k) {
-  const g = groups.find(x => x.key === k); if (!g) return closeDetail();
+  const g = groups.find(x => x.key === k);
+  if (!g) { // a workout only teammates logged: just its team board
+    const any = teamRows.find(r => groupKey(r.title) === k); if (!any) return closeDetail();
+    $("#detailBody").innerHTML = `${BACK}<div class="stack" style="margin-top:6px"><div><h1>${esc(normalise({ title: any.title }).title)}</h1>
+      ${any.prescription ? `<p class="sub" style="margin-top:4px">${esc(any.prescription)}</p>` : ""}</div>${teamBoard(k, openDay || any.day)}</div>`;
+    $("#back").onclick = closeDetail; return;
+  }
   const hasRx = g.list.some(r => r.rx), hasSc = g.list.some(r => !r.rx);
   if (!(detailRx ? hasRx : hasSc)) detailRx = hasRx;
   const list = g.list.filter(r => r.rx === detailRx), best = detailRx ? g.bestRx : g.bestSc;
@@ -676,7 +715,7 @@ function renderDetail(k) {
       <p class="small">Based on your best top set, rounded to 2.5 kg.${want ? ` The last board said ${want}%, so that row is lit.` : ""}</p></div>`;
   }
   $("#detailBody").innerHTML = `
-    <button class="back" id="back"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Back</button>
+    ${BACK}
     <div class="stack" style="margin-top:6px">
       <div><h1>${esc(g.title)}</h1>${presc ? `<p class="sub" style="margin-top:4px">${esc(presc)}</p>` : ""}</div>
       ${hasRx && hasSc ? `<div class="seg" id="rxPick"><button aria-pressed="${detailRx}" data-rx="1">RX</button><button aria-pressed="${!detailRx}" data-rx="0">Scaled</button></div>` : ""}
@@ -687,6 +726,7 @@ function renderDetail(k) {
         ${delta ? `<p class="sub" style="color:var(--label)">${esc(delta)}</p>` : ""}
         ${chart(list, g.kind)}</div>` : ""}
       ${pct}
+      ${teamBoard(k, openDay || g.last.day)}
       <div><h3 style="margin-bottom:8px">${g.kind === "strength" ? "Sessions" : "Attempts"}</h3>
         <div class="card">${list.map(r => `<div class="swipe"><button class="del" data-del="${r.id}">Delete</button>
           <button class="row" data-edit="${r.id}"><span class="grow"><span>${fmtDay(r.day)}</span>${r.notes ? `<span class="small">${esc(r.notes)}</span>` : ""}</span>
@@ -696,12 +736,13 @@ function renderDetail(k) {
   $("#back").onclick = closeDetail;
   $("#rxPick")?.addEventListener("click", e => { const b = e.target.closest("button"); if (b) { detailRx = b.dataset.rx === "1"; renderDetail(k); } });
 }
-function openDetail(k) {
-  openGroupKey = k; detailRx = true; renderDetail(k);
+let openDay = null; // the day the team board shows; null = your latest attempt
+function openDetail(k, day = null) {
+  openGroupKey = k; openDay = day; detailRx = true; renderDetail(k);
   $("#detail").scrollTop = 0; $("#detail").classList.add("open"); $("#detail").setAttribute("aria-hidden", "false");
 }
 function closeDetail() { openGroupKey = null; $("#detail").classList.remove("open"); $("#detail").setAttribute("aria-hidden", "true"); }
-document.addEventListener("click", e => { const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open); });
+document.addEventListener("click", e => { const o = e.target.closest("[data-open]"); if (o) openDetail(o.dataset.open, o.dataset.day || null); });
 
 // Swipe-to-delete on attempt rows: 10 px before committing to horizontal, then 1:1, then snap open or shut.
 (() => {
