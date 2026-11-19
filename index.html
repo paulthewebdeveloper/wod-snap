@@ -13,6 +13,7 @@
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <style>
   /* Apple's system colours, light and dark, following the phone. Blue = anything you can tap and charts,
      green = records and switches, red = delete only, grays for everything else. */
@@ -168,13 +169,21 @@
 </head>
 <body>
 
-<section id="setup" class="view hidden">
+<section id="signin" class="view hidden">
   <h1>WOD</h1>
-  <div class="hero" style="margin-top:20px">
-    <p class="sub">Paste your access code to connect.</p>
-    <div class="field"><input id="tokenIn" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Access code" aria-label="Access code"></div>
-    <button class="btn press" id="tokenSave">Connect</button>
-  </div>
+  <p class="sub" style="margin-top:6px">Sign in with the email your team admin added.</p>
+  <form class="hero" style="margin-top:20px" id="emailStep">
+    <label class="field"><input id="emailIn" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" placeholder="you@example.com" aria-label="Email" required></label>
+    <button class="btn press" type="submit">Send me a code</button>
+    <p class="small hidden" id="emailErr" style="color:var(--red)"></p>
+  </form>
+  <form class="hero hidden" style="margin-top:20px" id="codeStep">
+    <p class="sub">We emailed a 6-digit code to <strong id="codeTo" style="color:var(--label)"></strong>.</p>
+    <label class="field"><input id="codeIn" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{6}" maxlength="6" placeholder="123456" aria-label="6-digit code" required style="font-size:24px;letter-spacing:6px"></label>
+    <button class="btn press" type="submit">Sign in</button>
+    <p class="small hidden" id="codeErr" style="color:var(--red)"></p>
+    <button class="link" type="button" id="codeBack" style="align-self:center">Use a different email</button>
+  </form>
 </section>
 
 <!-- Today -->
@@ -282,16 +291,14 @@
 const API = "https://ktotbpvtkaubecmodgyb.supabase.co/functions/v1/wod";
 const $ = (s, el = document) => el.querySelector(s);
 const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch {} },
-};
 const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-// Token: from the link (#t=...) the first time, then from storage.
-const hashToken = new URLSearchParams(location.hash.slice(1)).get("t");
-if (hashToken) store.set("wodToken", hashToken);
-let token = store.get("wodToken") || hashToken;
+// Accounts: Supabase Auth with an emailed 6-digit code. The anon key is public by design; the database's row-level
+// security decides what each signed-in person can see. The session lives in this app's own storage and refreshes itself.
+const SB_URL = "https://ktotbpvtkaubecmodgyb.supabase.co";
+const SB_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt0b3RicHZ0a2F1YmVjbW9kZ3liIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUwNDU2NjksImV4cCI6MjExMDYyMTY2OX0.tIYqvPn6foMAdjeZbrGoDvaOzJa-c2rfmdnd8txiAzU";
+const sb = supabase.createClient(SB_URL, SB_ANON, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false } });
+let me = null; // { user_id, name, role, private, ... } from GET /me
 
 /* ---------- CrossFit vocabulary (crossfit.json, from andrewcampkin/chalk, MIT) ---------- */
 // 105 movements with short forms and 51 named workouts: one name per movement so "T2B" and
@@ -357,9 +364,12 @@ function toast(msg, kind = "ok") {
   clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.add("hidden"), 2600);
 }
 async function api(path, opts = {}) {
-  const r = await fetch(`${API}/${path}`, { ...opts, headers: { "content-type": "application/json", "x-app-token": token } });
+  const { data: { session } } = await sb.auth.getSession(); // refreshes an expired token first
+  if (!session) { showSignin(); throw new Error("Please sign in"); }
+  const r = await fetch(`${API}/${path}`, { ...opts, headers: { "content-type": "application/json", authorization: `Bearer ${session.access_token}` } });
   const body = await r.json().catch(() => ({}));
-  if (r.status === 401) { showSetup(); throw new Error("Access code rejected"); }
+  if (r.status === 401) { await sb.auth.signOut(); showSignin(); throw new Error("Please sign in again"); }
+  if (r.status === 403 && body.error === "not on the team") { await sb.auth.signOut(); showSignin("This account isn’t on the team any more."); throw new Error(body.error); }
   if (!r.ok) throw new Error(body.error || `HTTP ${r.status}`);
   return body;
 }
@@ -736,13 +746,46 @@ function go(tab) {
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); });
 
-/* ---------- Setup ---------- */
-function showSetup() { $("#setup").classList.remove("hidden"); for (const id of ["v-today", "v-progress", "v-bench", "tabs"]) $("#" + id).classList.add("hidden"); }
-$("#tokenSave").onclick = () => {
-  token = $("#tokenIn").value.trim(); if (!token) return;
-  store.set("wodToken", token); $("#setup").classList.add("hidden"); $("#v-today").classList.remove("hidden"); $("#tabs").classList.remove("hidden"); load();
+/* ---------- Sign in ---------- */
+const APP_VIEWS = ["v-today", "v-progress", "v-bench", "tabs"];
+function showSignin(message = "") {
+  closeDetail(); $("#signin").classList.remove("hidden"); APP_VIEWS.forEach(id => $("#" + id)?.classList.add("hidden"));
+  $("#emailStep").classList.remove("hidden"); $("#codeStep").classList.add("hidden");
+  $("#emailErr").textContent = message; $("#emailErr").classList.toggle("hidden", !message);
+}
+function showApp() { $("#signin").classList.add("hidden"); go("today"); $("#tabs").classList.remove("hidden"); }
+$("#emailStep").onsubmit = async e => {
+  e.preventDefault();
+  const email = $("#emailIn").value.trim().toLowerCase(), btn = $("#emailStep button");
+  btn.disabled = true; $("#emailErr").classList.add("hidden");
+  const { error } = await sb.auth.signInWithOtp({ email, options: { shouldCreateUser: false } });
+  btn.disabled = false;
+  if (error) {
+    $("#emailErr").textContent = /signup|not allowed|not found/i.test(error.message) ? "That email isn’t on the team yet. Ask your admin to add you." : error.message;
+    $("#emailErr").classList.remove("hidden"); return;
+  }
+  $("#codeTo").textContent = email; $("#emailStep").classList.add("hidden"); $("#codeStep").classList.remove("hidden");
+  $("#codeIn").value = ""; $("#codeIn").focus();
 };
-if (!token) showSetup(); else load();
+$("#codeStep").onsubmit = async e => {
+  e.preventDefault();
+  const btn = $("#codeStep button[type=submit]"); btn.disabled = true; $("#codeErr").classList.add("hidden");
+  const { error } = await sb.auth.verifyOtp({ email: $("#codeTo").textContent, token: $("#codeIn").value.trim(), type: "email" });
+  btn.disabled = false;
+  if (error) { $("#codeErr").textContent = "That code didn’t match, or it expired. Try again or send a new one."; $("#codeErr").classList.remove("hidden"); return; }
+  await start();
+};
+$("#codeIn").oninput = e => { if (/^\d{6}$/.test(e.target.value)) $("#codeStep").requestSubmit(); };
+$("#codeBack").onclick = () => showSignin();
+sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") showSignin(); });
+
+async function start() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return showSignin();
+  try { me = await api("me"); } catch { return; }
+  showApp(); await load();
+}
+start();
 </script>
 </body>
 </html>
