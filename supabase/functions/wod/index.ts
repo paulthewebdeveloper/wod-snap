@@ -33,19 +33,29 @@ Rules:
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "content-type, x-app-token",
+  "Access-Control-Allow-Headers": "authorization, content-type, apikey, x-client-info",
   "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "content-type": "application/json" } });
 
-const DB = `${Deno.env.get("SUPABASE_URL")}/rest/v1/results`;
-const KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-const db = (path: string, init: RequestInit = {}) =>
-  fetch(DB + path, {
+// Every database call runs AS the signed-in user (their token + the anon key), so row-level security decides what
+// they can read and write. The service key is used only for admin account work, after checking the caller is admin.
+const BASE = Deno.env.get("SUPABASE_URL")!;
+const ANON = Deno.env.get("SUPABASE_ANON_KEY")!;
+const SERVICE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const rest = (path: string, token: string, init: RequestInit = {}) =>
+  fetch(`${BASE}/rest/v1/${path}`, {
     ...init,
-    headers: { apikey: KEY, authorization: `Bearer ${KEY}`, "content-type": "application/json", prefer: "return=representation" },
+    headers: { apikey: ANON, authorization: `Bearer ${token}`, "content-type": "application/json", prefer: "return=representation" },
   });
+const authAdmin = (path: string, init: RequestInit = {}) =>
+  fetch(`${BASE}/auth/v1/admin/${path}`, {
+    ...init,
+    headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, "content-type": "application/json" },
+  });
+const UUID = /^[0-9a-f-]{36}$/;
+const relay = async (r: Response) => json(await r.json().catch(() => ({})), r.status);
 
 async function parse(image: string) {
   let last = "";
@@ -113,36 +123,75 @@ function extractParts(text: string) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
-  if (req.headers.get("x-app-token") !== Deno.env.get("APP_TOKEN")) return json({ error: "bad token" }, 401);
+  // Who is calling: a valid Supabase session, belonging to an active member.
+  const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
+  const who = token && await fetch(`${BASE}/auth/v1/user`, { headers: { apikey: ANON, authorization: `Bearer ${token}` } });
+  if (!who || !who.ok) return json({ error: "sign in again" }, 401);
+  const uid: string = (await who.json()).id;
+  const [me] = await (await rest(`members?user_id=eq.${uid}&select=*`, token)).json().catch(() => []);
+  if (!me?.active) return json({ error: "not on the team" }, 403);
 
-  const action = new URL(req.url).pathname.split("/").pop();
+  const url = new URL(req.url), action = url.pathname.split("/").pop(), id = url.searchParams.get("id") ?? "";
   try {
     if (req.method === "POST" && action === "parse") {
       const { image } = await req.json();
       if (typeof image !== "string" || !image.startsWith("data:image/")) return json({ error: "image must be a data URL" }, 400);
       return json(await parse(image));
     }
+    if (req.method === "GET" && action === "me") return json(me);
+
     if (req.method === "POST" && action === "save") {
       const { results } = await req.json();
-      const r = await db("", { method: "POST", body: JSON.stringify(results) });
-      return json(await r.json(), r.status);
+      // user_id is never taken from the client: the column defaults to the caller.
+      const rows = (results ?? []).map(({ day, title, kind, prescription, score, score_value, rx, notes }: any) =>
+        ({ day, title, kind, prescription, score, score_value, rx, notes }));
+      return relay(await rest("results", token, { method: "POST", body: JSON.stringify(rows) }));
     }
     if (req.method === "GET" && action === "list") {
-      const r = await db("?select=*&order=day.desc,created_at.desc&limit=1000");
-      return json(await r.json(), r.status);
+      const mine = url.searchParams.get("scope") !== "team";
+      const r = await rest(`results?select=*${mine ? `&user_id=eq.${uid}` : ""}&order=day.desc,created_at.desc&limit=2000`, token);
+      if (!r.ok || mine) return relay(r);
+      // Team scope: label each row with its owner's name (members has no foreign key to results, so join here).
+      const names = new Map((await (await rest("members?select=user_id,name", token)).json()).map((m: any) => [m.user_id, m.name]));
+      return json((await r.json()).map((row: any) => ({ ...row, owner_name: names.get(row.user_id) ?? "" })));
     }
     if (req.method === "PATCH" && action === "update") {
-      const id = new URL(req.url).searchParams.get("id") ?? "";
-      if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: "bad id" }, 400);
+      if (!UUID.test(id)) return json({ error: "bad id" }, 400);
       const { day, title, kind, prescription, score, score_value, rx, notes } = await req.json();
-      const r = await db(`?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ day, title, kind, prescription, score, score_value, rx, notes }) });
-      return json(await r.json(), r.status);
+      return relay(await rest(`results?id=eq.${id}`, token, { method: "PATCH", body: JSON.stringify({ day, title, kind, prescription, score, score_value, rx, notes }) }));
     }
     if (req.method === "DELETE" && action === "delete") {
-      const id = new URL(req.url).searchParams.get("id") ?? "";
-      if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: "bad id" }, 400);
-      const r = await db(`?id=eq.${id}`, { method: "DELETE" });
-      return json(await r.json(), r.status);
+      if (!UUID.test(id)) return json({ error: "bad id" }, 400);
+      return relay(await rest(`results?id=eq.${id}`, token, { method: "DELETE" }));
+    }
+
+    // Members. Admin and coach see everything; athletes see names only (for the team board).
+    if (req.method === "GET" && action === "members") {
+      const list = await (await rest("members?select=*&order=created_at", token)).json();
+      return json(me.role === "athlete" ? list.filter((m: any) => m.active).map(({ user_id, name }: any) => ({ user_id, name })) : list);
+    }
+    if (req.method === "POST" && action === "members") {
+      if (me.role !== "admin") return json({ error: "only the admin can add members" }, 403);
+      const { email, name, role = "athlete" } = await req.json();
+      if (!/^\S+@\S+\.\S+$/.test(email ?? "") || !["admin", "coach", "athlete"].includes(role)) return json({ error: "email and role needed" }, 400);
+      const made = await authAdmin("users", { method: "POST", body: JSON.stringify({ email: email.toLowerCase(), email_confirm: true }) });
+      const user = await made.json();
+      if (!made.ok) return json({ error: user.msg ?? user.error_description ?? "could not create the account" }, made.status);
+      return relay(await rest("members", token, { method: "POST", body: JSON.stringify({ user_id: user.id, email: user.email, name: name ?? "", role }) }));
+    }
+    if (req.method === "PATCH" && action === "members") {
+      if (!UUID.test(id)) return json({ error: "bad id" }, 400);
+      const body = await req.json(), keys = Object.keys(body);
+      const selfEdit = id === uid && keys.every((k) => k === "name" || k === "private");
+      if (!selfEdit && me.role !== "admin") return json({ error: "only the admin can change that" }, 403);
+      const patch = Object.fromEntries(keys.filter((k) => ["name", "private", "role", "active"].includes(k)).map((k) => [k, body[k]]));
+      const r = await rest(`members?user_id=eq.${id}`, token, { method: "PATCH", body: JSON.stringify(patch) });
+      if (r.ok && "active" in patch) {
+        // Removing someone also stops their sign-in; restoring lifts it. Their results are never deleted.
+        await authAdmin(`users/${id}`, { method: "PUT", body: JSON.stringify({ ban_duration: patch.active ? "none" : "876000h" }) });
+      }
+      const rows = await r.json().catch(() => []);
+      return json(Array.isArray(rows) ? rows[0] ?? {} : rows, r.ok ? 200 : r.status);
     }
     return json({ error: "not found" }, 404);
   } catch (e) {
