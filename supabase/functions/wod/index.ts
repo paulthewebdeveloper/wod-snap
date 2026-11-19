@@ -3,17 +3,20 @@
 // and no policies, so only this function (service role) can touch it.
 // ponytail: shared token, no user accounts. Add Supabase Auth if anyone but Paul uses it.
 
+// 2026-11-19, 5 runs each on a test board with reasoning off: nano 5/5 at 2s every time,
+// super 5/5 at ~3s, ling 5/5 at 3-8s. Gemma 4 was 429 on every call, so it is out.
 const MODELS = [
-  "nvidia/nemotron-3.5-super-vl:free", // read the test board perfectly; gemma failed on it
-  "google/gemma-4-31b-it:free",
-  "google/gemma-4-26b-a4b-it:free",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+  "nvidia/nemotron-3.5-super-vl:free",
+  "inclusionai/ling-3.2-flash:free",
 ];
+const PER_MODEL_MS = 20_000; // a free model that hangs gets skipped, not waited on
 
 const PROMPT = `This is a photo of a CrossFit gym whiteboard. Read the workout of the day.
 Return ONLY JSON, no prose, in this shape:
 {"parts":[{"title":"...","kind":"strength|for_time|amrap|emom|other","prescription":"..."}]}
 Rules:
-- One part per scored piece (A, B, C...). Skip warm-ups and mobility unless nothing else is on the board.
+- One part per scored piece. Leave the "A)" / "B)" labels out of titles. Skip warm-ups and mobility unless nothing else is on the board.
 - strength: title is the lift only, e.g. "Back Squat". prescription keeps the scheme, e.g. "5-5-3-3-1 @ 70-90%".
 - metcons: title is a short name, e.g. "21-15-9 Thrusters / Pull-ups" (or the benchmark name if written, e.g. "Fran").
   prescription is the full workout as written, one movement per line, with RX and scaled weights and any time cap.
@@ -38,25 +41,42 @@ const db = (path: string, init: RequestInit = {}) =>
 async function parse(image: string) {
   let last = "";
   for (const model of MODELS) {
-    const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: { authorization: `Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`, "content-type": "application/json" },
-      body: JSON.stringify({
-        model,
-        temperature: 0,
-        messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: image } }] }],
-      }),
-    });
-    const body = await r.json().catch(() => ({}));
-    const text: string = body?.choices?.[0]?.message?.content ?? "";
-    const start = text.indexOf("{"), end = text.lastIndexOf("}");
+    let body: any = {};
     try {
-      const out = JSON.parse(text.slice(start, end + 1));
-      if (Array.isArray(out.parts) && out.parts.length) return { model, parts: out.parts };
-    } catch { /* try the next model */ }
+      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+        method: "POST",
+        signal: AbortSignal.timeout(PER_MODEL_MS),
+        headers: { authorization: `Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`, "content-type": "application/json" },
+        body: JSON.stringify({
+          model,
+          temperature: 0,
+          reasoning: { enabled: false }, // thinking tripled the time (10s vs 3s) for the same answer
+          messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: image } }] }],
+        }),
+      });
+      body = await r.json().catch(() => ({}));
+    } catch (e) {
+      last = `${model}: ${e?.name === "TimeoutError" ? "timed out" : e}`;
+      continue;
+    }
+    const parts = extractParts(body?.choices?.[0]?.message?.content ?? "");
+    if (parts) return { model, parts };
     last = `${model}: ${body?.error?.message ?? "unreadable reply"}`;
   }
   throw new Error(last);
+}
+
+// Models sometimes add a stray "}" or prose after the JSON: shorten from the end until it parses.
+function extractParts(text: string) {
+  const start = text.indexOf("{");
+  for (let end = text.lastIndexOf("}"); start >= 0 && end > start; end = text.lastIndexOf("}", end - 1)) {
+    try {
+      const parts = JSON.parse(text.slice(start, end + 1)).parts;
+      if (Array.isArray(parts) && parts.length)
+        return parts.map((p: any) => ({ ...p, title: String(p.title ?? "").replace(/^[A-Z][).]\s*/, "") }));
+    } catch { /* shorter */ }
+  }
+  return null;
 }
 
 Deno.serve(async (req) => {

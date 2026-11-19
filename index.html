@@ -206,12 +206,12 @@ $("#addPart").onclick = () => addPart();
 $("#manual").onclick = () => openReview([{}]);
 $("#cancel").onclick = closeReview;
 
-// Photo: shrink on the phone first (a 12 MP shot is ~4 MB; 1600 px JPEG reads just as well).
+// Photo: shrink on the phone first (a 12 MP shot is ~4 MB; 1280 px JPEG read the test board exactly).
 function shrink(file) {
   return new Promise((ok, fail) => {
     const img = new Image();
     img.onload = () => {
-      const k = Math.min(1, 1600 / Math.max(img.width, img.height));
+      const k = Math.min(1, 1280 / Math.max(img.width, img.height));
       const c = document.createElement("canvas"); c.width = img.width * k; c.height = img.height * k;
       c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(img.src); ok(c.toDataURL("image/jpeg", 0.85));
@@ -222,13 +222,15 @@ function shrink(file) {
 }
 $("#photo").onchange = async e => {
   const file = e.target.files[0]; e.target.value = ""; if (!file) return;
-  $("#status").innerHTML = '<span class="spin"></span>Reading the board...';
+  const t0 = Date.now();
+  const tick = () => $("#status").innerHTML = `<span class="spin"></span>Reading the board... ${Math.round((Date.now() - t0) / 1000)}s`;
+  tick(); const timer = setInterval(tick, 1000);
   try {
     const { parts } = await api("parse", { method: "POST", body: JSON.stringify({ image: await shrink(file) }) });
     openReview(parts);
   } catch (err) {
     $("#status").textContent = `Could not read it: ${err.message}. Try again or log without a photo.`;
-  }
+  } finally { clearInterval(timer); }
 };
 
 $("#save").onclick = async () => {
