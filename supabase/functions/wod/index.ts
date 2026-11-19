@@ -3,11 +3,12 @@
 // and no policies, so only this function (service role) can touch it.
 // ponytail: shared token, no user accounts. Add Supabase Auth if anyone but Paul uses it.
 
-// 2026-11-19, 5 runs each on a test board with reasoning off: nano 5/5 at 2s every time,
-// super 5/5 at ~3s, ling 5/5 at 3-8s. Gemma 4 was 429 on every call, so it is out.
+// 2026-11-19, reasoning off. Simple board, 5 runs each: nano 5/5 at 2s, super 5/5 at ~3s, ling 5/5 at 3-8s.
+// Busy five-section board: super kept the E2M as one part and the cap on the right part (3.5s);
+// nano split the E2M and gave the finisher Part C's cap. Gemma 4 was 429 on every call, so it is out.
 const MODELS = [
-  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "nvidia/nemotron-3.5-super-vl:free",
+  "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "inclusionai/ling-3.2-flash:free",
 ];
 const PER_MODEL_MS = 20_000; // a free model that hangs gets skipped, not waited on
@@ -16,16 +17,21 @@ const PROMPT = `This is a photo of a CrossFit gym whiteboard. Read the workout o
 Return ONLY JSON, no prose, in this shape:
 {"parts":[{"title":"...","kind":"strength|for_time|amrap|emom|other","prescription":"..."}]}
 Rules:
-- One part per scored piece. Leave the "A)" / "B)" labels out of titles. Skip warm-ups and mobility unless nothing else is on the board.
+- Boards often hold several workouts: Part A / B / C, strength plus a metcon, an EMOM, a partner WOD, a finisher,
+  sometimes in columns. Return EVERY section as its own part, in board order, warm-up first if there is one
+  (title "Warm-up", kind "other"). Never merge two sections and never stop after the first.
+- Titles describe the work, never just the label: not "Part A" but "Deadlift" or "Partner run / devil press / wall balls".
+  Leave "A)", "Part B -" and similar labels out of titles.
 - strength: title is the lift only, e.g. "Back Squat". prescription keeps the scheme, e.g. "5-5-3-3-1 @ 70-90%".
 - metcons: title is a short name, e.g. "21-15-9 Thrusters / Pull-ups" (or the benchmark name if written, e.g. "Fran").
+  E2M / EMOM / "every X min" is kind "emom"; partner notes (synchro, YGIG) stay in the prescription.
   prescription is the full workout as written, one movement per line, with RX and scaled weights and any time cap.
 - Copy numbers exactly. If a word is unreadable, write [?].`;
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "content-type, x-app-token",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
+  "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
 };
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors, "content-type": "application/json" } });
@@ -97,6 +103,13 @@ Deno.serve(async (req) => {
     }
     if (req.method === "GET" && action === "list") {
       const r = await db("?select=*&order=day.desc,created_at.desc&limit=1000");
+      return json(await r.json(), r.status);
+    }
+    if (req.method === "PATCH" && action === "update") {
+      const id = new URL(req.url).searchParams.get("id") ?? "";
+      if (!/^[0-9a-f-]{36}$/.test(id)) return json({ error: "bad id" }, 400);
+      const { day, title, kind, prescription, score, score_value, rx, notes } = await req.json();
+      const r = await db(`?id=eq.${id}`, { method: "PATCH", body: JSON.stringify({ day, title, kind, prescription, score, score_value, rx, notes }) });
       return json(await r.json(), r.status);
     }
     if (req.method === "DELETE" && action === "delete") {

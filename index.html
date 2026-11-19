@@ -73,10 +73,16 @@
   <header><h1>WOD</h1><span class="label mono" id="today"></span></header>
   <div id="capture">
     <label class="panel" style="display:block;padding:0;border:0;background:none">
-      <input id="photo" type="file" accept="image/*" capture="environment" class="hidden">
+      <input id="photo" class="pick hidden" type="file" accept="image/*" capture="environment">
       <span class="primary big" style="display:block;text-align:center;background:var(--blue);padding:28px 16px;font-size:20px;font-weight:500">Snap the board</span>
     </label>
-    <button id="manual" style="width:100%">Log without a photo</button>
+    <div class="row">
+      <label class="grow" style="display:block">
+        <input class="pick hidden" type="file" accept="image/*">
+        <span style="display:block;text-align:center;border:1px solid var(--line);padding:12px 16px">Upload a photo</span>
+      </label>
+      <button id="manual" class="grow">No photo</button>
+    </div>
     <p class="muted small" id="status" style="margin-top:16px"></p>
   </div>
   <div id="review" class="hidden">
@@ -184,18 +190,30 @@ function scoreValue(kind, s) {
 const lowerIsBetter = kind => kind === "for_time";
 
 // Review
-function addPart(p = {}) {
+// One part form, used both for a new board and for editing a saved result.
+function makePart(p = {}) {
   const el = $("#partTpl").content.firstElementChild.cloneNode(true);
   $(".title", el).value = p.title || "";
   $(".kind", el).value = p.kind || "other";
   $(".prescription", el).value = p.prescription || "";
+  $(".score", el).value = p.score || "";
+  $(".notes", el).value = p.notes || "";
+  const setRx = rx => { $(".rx", el).classList.toggle("on", rx); $(".sc", el).classList.toggle("on", !rx); };
+  setRx(p.rx !== false);
   const setPh = () => $(".score", el).placeholder = PLACEHOLDER[$(".kind", el).value];
   $(".kind", el).onchange = setPh; setPh();
-  $(".rx", el).onclick = () => { $(".rx", el).classList.add("on"); $(".sc", el).classList.remove("on"); };
-  $(".sc", el).onclick = () => { $(".sc", el).classList.add("on"); $(".rx", el).classList.remove("on"); };
+  $(".rx", el).onclick = () => setRx(true);
+  $(".sc", el).onclick = () => setRx(false);
   $(".drop", el).onclick = () => el.remove();
-  $("#parts").append(el);
+  return el;
 }
+function readPart(el, day) {
+  const kind = $(".kind", el).value, score = $(".score", el).value.trim();
+  return { day, kind, title: $(".title", el).value.trim(), prescription: $(".prescription", el).value.trim() || null,
+           score: score || null, score_value: scoreValue(kind, score), rx: $(".rx", el).classList.contains("on"),
+           notes: $(".notes", el).value.trim() || null };
+}
+const addPart = p => $("#parts").append(makePart(p));
 function openReview(parts) {
   $("#parts").innerHTML = ""; parts.forEach(addPart);
   $("#day").value = today();
@@ -220,7 +238,9 @@ function shrink(file) {
     img.src = URL.createObjectURL(file);
   });
 }
-$("#photo").onchange = async e => {
+// Camera (capture) and library upload share one handler.
+document.querySelectorAll(".pick").forEach(i => i.onchange = readBoard);
+async function readBoard(e) {
   const file = e.target.files[0]; e.target.value = ""; if (!file) return;
   const t0 = Date.now();
   const tick = () => $("#status").innerHTML = `<span class="spin"></span>Reading the board... ${Math.round((Date.now() - t0) / 1000)}s`;
@@ -231,16 +251,11 @@ $("#photo").onchange = async e => {
   } catch (err) {
     $("#status").textContent = `Could not read it: ${err.message}. Try again or log without a photo.`;
   } finally { clearInterval(timer); }
-};
+}
 
 $("#save").onclick = async () => {
   const day = $("#day").value || today();
-  const results = [...document.querySelectorAll("#parts .part")].map(el => {
-    const kind = $(".kind", el).value, score = $(".score", el).value.trim();
-    return { day, kind, title: $(".title", el).value.trim(), prescription: $(".prescription", el).value.trim() || null,
-             score: score || null, score_value: scoreValue(kind, score), rx: $(".rx", el).classList.contains("on"),
-             notes: $(".notes", el).value.trim() || null };
-  }).filter(r => r.title);
+  const results = [...document.querySelectorAll("#parts .part")].map(el => readPart(el, day)).filter(r => r.title);
   if (!results.length) return toast("Give each part a name", "err");
   $("#save").disabled = true;
   try { await api("save", { method: "POST", body: JSON.stringify({ results }) }); toast(`Saved ${results.length} part${results.length > 1 ? "s" : ""}`); closeReview(); }
@@ -284,19 +299,41 @@ function renderHistory() {
       <div class="hist-head"><h2>${esc(list[0].title)}</h2><span class="label">${list.length}×</span></div>
       ${best ? `<p class="mono small pr">PR ${esc(best.score)} · ${fmtDay(best.day)}</p>` : ""}
       ${spark(chrono, lower)}
-      ${list.map(r => `<div class="entry"><span class="mono muted">${fmtDay(r.day)}</span>
+      ${list.map(r => `<div class="entry" data-edit="${r.id}" style="cursor:pointer"><span class="mono muted">${fmtDay(r.day)}</span>
         <span class="mono">${esc(r.score || "-")}${r.rx ? "" : " <span class='muted'>sc</span>"}${r === best ? " <span class='pr'>PR</span>" : ""}</span>
-        <button class="del small muted" data-id="${r.id}" style="padding:0 4px;border:0">×</button></div>
+        <span class="small muted">edit</span></div>
         ${r.notes ? `<p class="muted small">${esc(r.notes)}</p>` : ""}`).join("")}
     </div>`;
   }).join("") || `<p class="muted">Nothing logged yet.</p>`;
 }
 $("#filter").oninput = renderHistory;
-$("#groups").onclick = async e => {
-  const b = e.target.closest(".del"); if (!b) return;
-  if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "delete?"; b.style.color = "var(--bad)"; return; }
-  try { await api(`delete?id=${b.dataset.id}`, { method: "DELETE" }); rows = rows.filter(r => r.id !== b.dataset.id); renderHistory(); }
-  catch (err) { toast(err.message, "err"); }
+// Tap a saved result to edit it in place: the same form as a new board, plus its date and Delete.
+$("#groups").onclick = e => {
+  const entry = e.target.closest("[data-edit]"); if (!entry) return;
+  const r = rows.find(x => x.id === entry.dataset.edit); if (!r) return;
+  document.querySelector("#groups .editor")?.remove();
+  const box = document.createElement("div"); box.className = "editor";
+  const part = makePart(r); $(".drop", part).remove();
+  box.innerHTML = `<div class="row" style="margin:8px 0"><input type="date" class="mono day" value="${r.day}"></div>`;
+  box.append(part);
+  const bar = document.createElement("div"); bar.className = "row"; bar.style.marginBottom = "8px";
+  bar.innerHTML = `<button class="del">Delete</button><button class="cancel">Cancel</button><button class="primary grow ok">Save</button>`;
+  box.append(bar);
+  entry.after(box);
+  $(".cancel", bar).onclick = () => box.remove();
+  $(".ok", bar).onclick = async () => {
+    const upd = readPart(part, $(".day", box).value || r.day);
+    if (!upd.title) return toast("Give it a name", "err");
+    try { const [saved] = await api(`update?id=${r.id}`, { method: "PATCH", body: JSON.stringify(upd) });
+          Object.assign(r, saved); renderHistory(); toast("Updated"); }
+    catch (err) { toast(`Not saved: ${err.message}`, "err"); }
+  };
+  $(".del", bar).onclick = async ev => {
+    const b = ev.target;
+    if (b.dataset.armed !== "1") { b.dataset.armed = "1"; b.textContent = "Sure?"; b.style.color = "var(--bad)"; return; }
+    try { await api(`delete?id=${r.id}`, { method: "DELETE" }); rows = rows.filter(x => x.id !== r.id); renderHistory(); toast("Deleted"); }
+    catch (err) { toast(err.message, "err"); }
+  };
 };
 async function loadHistory() {
   try { rows = await api("list"); renderHistory(); } catch (err) { toast(err.message, "err"); }
