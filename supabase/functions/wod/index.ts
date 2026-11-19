@@ -3,10 +3,13 @@
 // and no policies, so only this function (service role) can touch it.
 // ponytail: shared token, no user accounts. Add Supabase Auth if anyone but Paul uses it.
 
-// 2026-11-19, reasoning off. Simple board, 5 runs each: nano 5/5 at 2s, super 5/5 at ~3s, ling 5/5 at 3-8s.
-// Busy five-section board: super kept the E2M as one part and the cap on the right part (3.5s);
+// 2026-11-19, reasoning off. Gemini 3.5 Flash-Lite (Google free tier, own key): 6/6 right on both boards at
+// 1.6-2.8s. Gemini 3.1 Flash-Lite: 5/6, one Google 503. Simple board, 5 runs each on OpenRouter: nano 5/5 at
+// 2s, super 5/5 at ~3s. Busy five-section board: super kept the E2M as one part and the cap on the right part;
 // nano split the E2M and gave the finisher Part C's cap. Gemma 4 was 429 on every call, so it is out.
 const MODELS = [
+  "gemini/gemini-3.5-flash-lite",
+  "gemini/gemini-3.1-flash-lite",
   "nvidia/nemotron-3.5-super-vl:free",
   "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
   "inclusionai/ling-3.2-flash:free",
@@ -47,29 +50,52 @@ const db = (path: string, init: RequestInit = {}) =>
 async function parse(image: string) {
   let last = "";
   for (const model of MODELS) {
-    let body: any = {};
+    if (model.startsWith("gemini/") && !Deno.env.get("GEMINI_API_KEY")) continue;
+    let reply: { text: string; error?: string };
     try {
-      const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
-        method: "POST",
-        signal: AbortSignal.timeout(PER_MODEL_MS),
-        headers: { authorization: `Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`, "content-type": "application/json" },
-        body: JSON.stringify({
-          model,
-          temperature: 0,
-          reasoning: { enabled: false }, // thinking tripled the time (10s vs 3s) for the same answer
-          messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: image } }] }],
-        }),
-      });
-      body = await r.json().catch(() => ({}));
+      reply = model.startsWith("gemini/") ? await askGemini(model.slice(7), image) : await askOpenRouter(model, image);
     } catch (e) {
       last = `${model}: ${e?.name === "TimeoutError" ? "timed out" : e}`;
       continue;
     }
-    const parts = extractParts(body?.choices?.[0]?.message?.content ?? "");
+    const parts = extractParts(reply.text);
     if (parts) return { model, parts };
-    last = `${model}: ${body?.error?.message ?? "unreadable reply"}`;
+    last = `${model}: ${reply.error ?? "unreadable reply"}`;
   }
   throw new Error(last);
+}
+
+async function askOpenRouter(model: string, image: string) {
+  const r = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+    method: "POST",
+    signal: AbortSignal.timeout(PER_MODEL_MS),
+    headers: { authorization: `Bearer ${Deno.env.get("OPENROUTER_API_KEY")}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      model,
+      temperature: 0,
+      reasoning: { enabled: false }, // thinking tripled the time (10s vs 3s) for the same answer
+      messages: [{ role: "user", content: [{ type: "text", text: PROMPT }, { type: "image_url", image_url: { url: image } }] }],
+    }),
+  });
+  const body = await r.json().catch(() => ({}));
+  return { text: body?.choices?.[0]?.message?.content ?? "", error: body?.error?.message };
+}
+
+// Google AI Studio free tier, called directly (not through OpenRouter). Gemini 3.x takes thinkingLevel;
+// the old thinkingBudget: 0 is a 400 on 3.5.
+async function askGemini(model: string, image: string) {
+  const [, mime, data] = image.match(/^data:(image\/[\w+.-]+);base64,(.*)$/s) ?? [];
+  const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    signal: AbortSignal.timeout(PER_MODEL_MS),
+    headers: { "x-goog-api-key": Deno.env.get("GEMINI_API_KEY")!, "content-type": "application/json" },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: PROMPT }, { inline_data: { mime_type: mime, data } }] }],
+      generationConfig: { temperature: 0, responseMimeType: "application/json", thinkingConfig: { thinkingLevel: "minimal" } },
+    }),
+  });
+  const body = await r.json().catch(() => ({}));
+  return { text: body?.candidates?.[0]?.content?.parts?.map((p: any) => p.text ?? "").join("") ?? "", error: body?.error?.message };
 }
 
 // Models sometimes add a stray "}" or prose after the JSON: shorten from the end until it parses.
