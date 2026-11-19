@@ -83,7 +83,7 @@
   .seg.tall button { height: 40px; font-size: 14px; }
 
   /* Tab bar: a translucent layer that content scrolls under. */
-  nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+  nav.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
              padding: 7px 0 calc(env(safe-area-inset-bottom) + 4px); background: var(--bar);
              -webkit-backdrop-filter: blur(20px) saturate(180%); backdrop-filter: blur(20px) saturate(180%); border-top: .5px solid var(--sep); }
   nav.tabs button { display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10px; font-weight: 600; color: #8A8A8E; min-height: 44px; }
@@ -189,9 +189,11 @@
 
 <!-- Today -->
 <main id="v-today" class="view stack">
-  <div>
-    <p class="eyebrow" id="dateLine"></p>
-    <h1>Today</h1>
+  <div style="display:flex;justify-content:space-between;align-items:flex-end">
+    <div><p class="eyebrow" id="dateLine"></p><h1>Today</h1></div>
+    <button class="press" id="profileBtn" aria-label="Profile" style="width:44px;height:44px;border-radius:22px;background:var(--input);color:var(--blue);display:grid;place-items:center">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg>
+    </button>
   </div>
   <div class="hero" id="hero">
     <div id="heroIdle" style="display:flex;flex-direction:column;gap:16px">
@@ -219,9 +221,17 @@
   </div>
 </main>
 
+<!-- Team (admin and coach) -->
+<main id="v-team" class="view hidden">
+  <h1>Team</h1>
+  <p class="sub" style="margin-top:6px">Everyone’s progress, read-only.</p>
+  <div class="card" id="teamList" style="margin-top:16px"></div>
+</main>
+
 <!-- Progress -->
 <main id="v-progress" class="view hidden">
-  <h1>Progress</h1>
+  <button class="back hidden" id="memberBack"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>Team</button>
+  <h1 id="progressTitle">Progress</h1>
   <label class="search" style="margin-top:14px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true" style="color:var(--label2)"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg><input id="filter" placeholder="Squat, Fran, thrusters" aria-label="Search"></label>
   <div class="seg" id="cat" style="margin-top:12px">
     <button aria-pressed="true" data-cat="all">All</button><button aria-pressed="false" data-cat="lift">Lifts</button><button aria-pressed="false" data-cat="bench">Benchmarks</button><button aria-pressed="false" data-cat="metcon">Metcons</button>
@@ -248,6 +258,7 @@
   <button aria-current="page" data-go="today"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Today</button>
   <button data-go="progress"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l5-6 4 3 7-9"/><path d="M15 7h5v5"/></svg>Progress</button>
   <button data-go="bench"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/></svg>Benchmarks</button>
+  <button data-go="team" class="hidden" id="teamTab"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c1-3.5 3.5-5 6.5-5s5.5 1.5 6.5 5"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.5c2.6 0 4.6 1.3 5.5 4.5"/></svg>Team</button>
 </nav>
 
 <!-- Sheet -->
@@ -576,9 +587,10 @@ $$(".pick").forEach(i => i.onchange = async e => {
 /* ---------- Data and grouping ---------- */
 let rows = [], groups = [];
 function category(g) { return g.bench ? "bench" : g.kind === "strength" ? "lift" : "metcon"; }
-function buildGroups() {
+let viewing = null; // a teammate whose progress admin/coach is looking at, read-only; null = your own
+function buildGroups(source = viewing ? teamRows.filter(r => r.user_id === viewing.user_id) : rows) {
   const m = new Map();
-  for (const r of rows) {
+  for (const r of source) {
     const k = groupKey(r.title);
     if (!m.has(k)) m.set(k, { key: k, title: normalise({ title: r.title }).title, kind: r.kind, list: [] });
     m.get(k).list.push(r);
@@ -728,10 +740,13 @@ function renderDetail(k) {
       ${pct}
       ${teamBoard(k, openDay || g.last.day)}
       <div><h3 style="margin-bottom:8px">${g.kind === "strength" ? "Sessions" : "Attempts"}</h3>
-        <div class="card">${list.map(r => `<div class="swipe"><button class="del" data-del="${r.id}">Delete</button>
-          <button class="row" data-edit="${r.id}"><span class="grow"><span>${fmtDay(r.day)}</span>${r.notes ? `<span class="small">${esc(r.notes)}</span>` : ""}</span>
-            <span class="num" style="font-weight:600;${isCapped(r) ? "color:var(--label2);font-weight:400" : ""}">${esc(fmtScore(r))}</span>${r === best ? `<span class="chip">PR</span>` : ""}</button></div>`).join("")}</div>
-        <p class="small" style="margin:8px 4px 0">Swipe left to delete, tap to edit.</p></div>
+        <div class="card">${list.map(r => {
+          const inner = `<span class="grow"><span>${fmtDay(r.day)}</span>${r.notes ? `<span class="small">${esc(r.notes)}</span>` : ""}</span>
+            <span class="num" style="font-weight:600;${isCapped(r) ? "color:var(--label2);font-weight:400" : ""}">${esc(fmtScore(r))}</span>${r === best ? `<span class="chip">PR</span>` : ""}`;
+          return viewing ? `<div class="row">${inner}</div>` // someone else's log: read-only
+            : `<div class="swipe"><button class="del" data-del="${r.id}">Delete</button><button class="row" data-edit="${r.id}">${inner}</button></div>`;
+        }).join("")}</div>
+        ${viewing ? "" : `<p class="small" style="margin:8px 4px 0">Swipe left to delete, tap to edit.</p>`}</div>
     </div>`;
   $("#back").onclick = closeDetail;
   $("#rxPick")?.addEventListener("click", e => { const b = e.target.closest("button"); if (b) { detailRx = b.dataset.rx === "1"; renderDetail(k); } });
@@ -779,16 +794,103 @@ document.addEventListener("click", e => { const o = e.target.closest("[data-open
 })();
 
 /* ---------- Tabs ---------- */
-function go(tab) {
+function go(tab, { member = null } = {}) {
   closeDetail();
-  for (const t of ["today", "progress", "bench"]) $(`#v-${t}`).classList.toggle("hidden", t !== tab);
-  $$("#tabs button").forEach(b => b.dataset.go === tab ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  if (viewing !== member) { viewing = member; buildGroups(); renderProgress(); }
+  $("#progressTitle").textContent = viewing ? `${viewing.name || "Teammate"}’s progress` : "Progress";
+  $("#memberBack").classList.toggle("hidden", !viewing);
+  for (const t of ["today", "progress", "bench", "team"]) $(`#v-${t}`).classList.toggle("hidden", t !== tab);
+  const current = viewing ? "team" : tab;
+  $$("#tabs button").forEach(b => b.dataset.go === current ? b.setAttribute("aria-current", "page") : b.removeAttribute("aria-current"));
+  if (tab === "team") renderTeam();
   scrollTo(0, 0);
+}
+$("#memberBack").onclick = () => go("team");
+
+/* ---------- Team tab (admin and coach) ---------- */
+let members = [];
+async function loadMembers() { try { members = await api("members"); } catch (e) { toast(e.message, "err"); } }
+function renderTeam() {
+  const prs = uid => { // records this person set in the last 30 days, one per workout
+    const by = new Map();
+    for (const r of teamRows.filter(r => r.user_id === uid && r.score_value != null && r.rx)) {
+      const k = groupKey(r.title), b = by.get(k);
+      if (!b || better(r.kind, r.score_value, b.score_value)) by.set(k, r);
+    }
+    return [...by.values()].filter(r => daysAgo(r.day) <= 30).length;
+  };
+  $("#teamList").innerHTML = members.filter(m => m.active).map(m => {
+    const last = teamRows.find(r => r.user_id === m.user_id), n = prs(m.user_id);
+    const when = !last ? "Nothing logged yet" : last.day === today() ? "Logged today" : `Last logged ${fmtDay(last.day, { day: "numeric", month: "short" })}`;
+    return `<button class="row press" data-member="${m.user_id}">
+      <span class="grow"><span class="t">${esc(m.name || m.email)}${m.user_id === me.user_id ? " (you)" : ""}</span>
+      <span class="small">${when}${m.private ? " · private" : ""}${m.role !== "athlete" ? ` · ${m.role}` : ""}</span></span>
+      ${n ? `<span class="pr">${n} PR${n > 1 ? "s" : ""}</span>` : ""}${CHEV}</button>`;
+  }).join("") || `<div class="row"><span class="small">No members yet.</span></div>`;
+}
+document.addEventListener("click", e => {
+  const b = e.target.closest("[data-member]"); if (!b) return;
+  const m = members.find(x => x.user_id === b.dataset.member);
+  if (m.user_id === me.user_id) return go("progress");
+  go("progress", { member: m });
+});
+
+/* ---------- Profile and Members ---------- */
+$("#profileBtn").onclick = () => openSheet("Profile", body => {
+  body.innerHTML = `
+    <div class="part"><label class="small" for="pfName">Your name, as teammates see it</label>
+      <div class="field"><input id="pfName" value="${esc(me.name)}" autocomplete="name"></div>
+      <div class="split" style="justify-content:space-between"><span><span style="display:block">Private</span><span class="small">Teammates can’t see your results. Admin and coach still can.</span></span>
+        <button class="switch" role="switch" id="pfPrivate" aria-checked="${!!me.private}" aria-label="Private"></button></div>
+      <p class="small">Signed in as ${esc(me.email)} · ${esc(me.role)}</p></div>
+    ${me.role === "admin" ? `<h3 style="margin:22px 4px 0">Members</h3><div id="pfMembers"></div>
+      <div class="part"><span style="font-weight:600">Add someone</span>
+        <div class="field"><input id="addEmail" type="email" placeholder="Email" autocapitalize="off" aria-label="Email"></div>
+        <div class="field"><input id="addName" placeholder="Name" aria-label="Name"></div>
+        <div class="seg tall" id="addRole"><button aria-pressed="true" data-role="athlete">Athlete</button><button aria-pressed="false" data-role="coach">Coach</button></div>
+        <button class="btn press" id="addBtn">Add to the team</button></div>` : ""}
+    <button class="danger press" id="signOut">Sign out</button>`;
+  $("#pfPrivate").onclick = e => e.currentTarget.setAttribute("aria-checked", String(e.currentTarget.getAttribute("aria-checked") !== "true"));
+  $("#signOut").onclick = async () => { closeSheet(); await sb.auth.signOut(); };
+  if (me.role === "admin") {
+    renderMemberAdmin();
+    $("#addRole").onclick = e => { const b = e.target.closest("button"); if (b) setPressed($("#addRole"), b); };
+    $("#addBtn").onclick = async () => {
+      const email = $("#addEmail").value.trim(), name = $("#addName").value.trim(), role = $('#addRole [aria-pressed="true"]').dataset.role;
+      try { await api("members", { method: "POST", body: JSON.stringify({ email, name, role }) }); }
+      catch (err) { return toast(err.message, "err"); }
+      toast(`${name || email} added. They can sign in now.`); $("#addEmail").value = $("#addName").value = "";
+      await loadMembers(); renderMemberAdmin();
+    };
+  }
+}, async () => {
+  const patch = { name: $("#pfName").value.trim(), private: $("#pfPrivate").getAttribute("aria-checked") === "true" };
+  try { me = { ...me, ...(await api(`members?id=${me.user_id}`, { method: "PATCH", body: JSON.stringify(patch) })) }; }
+  catch (err) { toast(err.message, "err"); return false; }
+  toast("Saved"); await load();
+}, "Done");
+function renderMemberAdmin() {
+  const box = $("#pfMembers"); if (!box) return;
+  box.innerHTML = members.filter(m => m.user_id !== me.user_id).map(m => `<div class="part" data-mid="${m.user_id}" style="${m.active ? "" : "opacity:.6"}">
+      <div><span style="font-weight:600">${esc(m.name || m.email)}</span><span class="small" style="display:block">${esc(m.email)}${m.active ? "" : " · removed"}</span></div>
+      ${m.active ? `<div class="seg tall"><button aria-pressed="${m.role === "athlete"}" data-set-role="athlete">Athlete</button><button aria-pressed="${m.role === "coach"}" data-set-role="coach">Coach</button><button aria-pressed="${m.role === "admin"}" data-set-role="admin">Admin</button></div>` : ""}
+      <button class="link" data-set-active="${!m.active}" style="align-self:flex-start;color:${m.active ? "var(--red)" : "var(--blue)"}">${m.active ? "Remove from team" : "Restore"}</button></div>`).join("")
+    || `<p class="small" style="margin:8px 4px">Nobody else yet. Add your coach and teammates below.</p>`;
+  box.onclick = async e => {
+    const card = e.target.closest("[data-mid]"), role = e.target.closest("[data-set-role]"), act = e.target.closest("[data-set-active]");
+    if (!card || !(role || act)) return;
+    const patch = role ? { role: role.dataset.setRole } : { active: act.dataset.setActive === "true" };
+    if (act && !patch.active && act.dataset.armed !== "1") { act.dataset.armed = "1"; act.textContent = "Tap again to remove"; return; }
+    try { await api(`members?id=${card.dataset.mid}`, { method: "PATCH", body: JSON.stringify(patch) }); }
+    catch (err) { return toast(err.message, "err"); }
+    await loadMembers(); renderMemberAdmin();
+    toast(role ? "Role changed" : patch.active ? "Restored" : "Removed. Their history stays with you and the coach.");
+  };
 }
 document.addEventListener("click", e => { const b = e.target.closest("[data-go]"); if (b) go(b.dataset.go); });
 
 /* ---------- Sign in ---------- */
-const APP_VIEWS = ["v-today", "v-progress", "v-bench", "tabs"];
+const APP_VIEWS = ["v-today", "v-progress", "v-bench", "v-team", "tabs"];
 function showSignin(message = "") {
   closeDetail(); $("#signin").classList.remove("hidden"); APP_VIEWS.forEach(id => $("#" + id)?.classList.add("hidden"));
   $("#emailStep").classList.remove("hidden"); $("#codeStep").classList.add("hidden");
@@ -824,7 +926,9 @@ async function start() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return showSignin();
   try { me = await api("me"); } catch { return; }
-  showApp(); await load();
+  const lead = me.role === "admin" || me.role === "coach";
+  $("#teamTab").classList.toggle("hidden", !lead);
+  showApp(); await Promise.all([load(), lead ? loadMembers() : null]);
 }
 start();
 </script>

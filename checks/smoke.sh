@@ -24,6 +24,8 @@ token() { curl -sS -X POST "$URL/auth/v1/token?grant_type=password" -H "apikey: 
   -d "{\"email\":\"$1\",\"password\":\"$PW\"}" | python3 -c "import json,sys;print(json.load(sys.stdin)['access_token'])"; }
 cleanup() {
   for id in ${U1:-} ${U2:-}; do
+    # results hold a foreign key to the account, so remove them first or the account delete is refused
+    curl -sS -X DELETE "$URL/rest/v1/results?user_id=eq.$id" -H "apikey: $SR" -H "Authorization: Bearer $SR" >/dev/null || true
     curl -sS -X DELETE "$URL/auth/v1/admin/users/$id" -H "apikey: $SR" -H "Authorization: Bearer $SR" >/dev/null || true
   done
   rm -rf "$TMP"
