@@ -147,6 +147,46 @@ const hashToken = new URLSearchParams(location.hash.slice(1)).get("t");
 if (hashToken) store.set("wodToken", hashToken);
 let token = store.get("wodToken") || hashToken;
 
+// CrossFit vocabulary (crossfit.json, from andrewcampkin/chalk, MIT): 105 movements with their short forms
+// and 51 named workouts. Used to give one movement one name, so "T2B" and "Toes-to-bar" chart together,
+// and to recognise a benchmark (Fran, Murph...) by its name or by its movements plus rep scheme.
+let CF = { movements: [], benchmarks: [] }, ALIAS = new Map();
+const key = s => s.toLowerCase().replace(/[^a-z0-9&]+/g, " ").trim();
+const singular = s => s.replace(/(?<=[a-z]{2})(es|s)$/, ""); // "DUs" -> "du", "thrusters" -> "thruster"
+fetch("crossfit.json").then(r => r.json()).then(d => {
+  CF = d;
+  for (const m of d.movements) for (const a of [m.name, m.slug, ...m.aliases]) {
+    ALIAS.set(key(a), m); ALIAS.set(singular(key(a)), m);
+  }
+}).catch(() => {}); // ponytail: without the list the app still works, titles just stay as written
+
+const canonMove = s => ALIAS.get(key(s)) || ALIAS.get(singular(key(s)));
+// Movement slugs mentioned anywhere in a text, longest name first so "power clean" beats "clean".
+function movesIn(text) {
+  const t = ` ${key(text)} `, found = new Set();
+  [...ALIAS.keys()].filter(a => a.length > 2).sort((a, b) => b.length - a.length).forEach(a => {
+    if (t.includes(` ${a} `) || t.includes(` ${a}s `)) found.add(ALIAS.get(a).slug);
+  });
+  return found;
+}
+const SCORE_KIND = { time: "for_time", rounds_reps: "amrap", load: "strength", reps: "other" };
+function findBenchmark(title, prescription) {
+  const byName = CF.benchmarks.find(b => key(title) === key(b.name) || key(title).startsWith(key(b.name) + " "));
+  if (byName) return byName;
+  // Scaled options name other movements (ring rows for pull-ups), so read only the RX part.
+  const text = `${title} ${prescription}`.split(/scaled/i)[0], moves = movesIn(text), scheme = (text.match(/\d+(?:-\d+)+/) || [])[0];
+  return CF.benchmarks.find(b => scheme && b.prescription.includes(scheme) &&
+    b.movements.length === moves.size && b.movements.every(m => moves.has(m)));
+}
+// One name per thing: benchmark name if it is one, else each movement piece in its canonical form.
+function normalise(p) {
+  const b = findBenchmark(p.title || "", p.prescription || "");
+  if (b) return { ...p, title: b.name, kind: SCORE_KIND[b.score] || p.kind, benchmark: b };
+  const title = (p.title || "").split(/\s*\/\s*/).map(x => canonMove(x)?.name || x).join(" / ");
+  return { ...p, title };
+}
+const groupKey = title => key(normalise({ title }).title);
+
 const today = () => new Date().toLocaleDateString("en-CA");
 $("#today").textContent = new Date().toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
 
@@ -179,9 +219,14 @@ document.querySelectorAll("nav button").forEach(b => b.onclick = () => {
 });
 
 // Score: what Paul types, and the one number charts use.
-const PLACEHOLDER = { strength: "Top set, kg", for_time: "Time, e.g. 8:42", amrap: "Rounds+reps, e.g. 5+12", emom: "Score", other: "Score" };
+const PLACEHOLDER = { strength: "Top set, kg", for_time: "8:42 or cap 145", amrap: "Rounds+reps, e.g. 5+12", emom: "Score", other: "Score" };
+// ponytail: a capped result is stored as CAPPED - reps, so it always ranks after every finished time
+// (lower is better) and more reps still beats fewer. Breaks only for times over ~27 hours.
+const CAPPED = 100000;
+const isCapped = r => r.kind === "for_time" && r.score_value >= CAPPED - 10000;
 function scoreValue(kind, s) {
   s = (s || "").trim(); if (!s) return null;
+  if (kind === "for_time" && /cap/i.test(s)) { const reps = parseInt(s.replace(/\D+/g, " ").trim()); return CAPPED - (reps || 0); }
   if (kind === "for_time" && s.includes(":")) { const [m, sec] = s.split(":").map(Number); return m * 60 + (sec || 0); }
   // ponytail: rounds + reps/1000 orders AMRAPs correctly without knowing reps per round
   if (kind === "amrap" && s.includes("+")) { const [r, reps] = s.split("+").map(Number); return r + (reps || 0) / 1000; }
@@ -194,6 +239,11 @@ const lowerIsBetter = kind => kind === "for_time";
 function makePart(p = {}) {
   const el = $("#partTpl").content.firstElementChild.cloneNode(true);
   $(".title", el).value = p.title || "";
+  if (p.benchmark) {
+    const tag = document.createElement("p"); tag.className = "label pr";
+    tag.textContent = `Benchmark · standard: ${p.benchmark.prescription}`;
+    $(".prescription", el).before(tag);
+  }
   $(".kind", el).value = p.kind || "other";
   $(".prescription", el).value = p.prescription || "";
   $(".score", el).value = p.score || "";
@@ -215,7 +265,7 @@ function readPart(el, day) {
 }
 const addPart = p => $("#parts").append(makePart(p));
 function openReview(parts) {
-  $("#parts").innerHTML = ""; parts.forEach(addPart);
+  $("#parts").innerHTML = ""; parts.map(normalise).forEach(addPart);
   $("#day").value = today();
   $("#capture").classList.add("hidden"); $("#review").classList.remove("hidden");
 }
@@ -285,22 +335,28 @@ function renderHistory() {
   const groups = new Map();
   for (const r of rows) {
     if (q && !(r.title + " " + (r.prescription || "")).toLowerCase().includes(q)) continue;
-    const k = r.title.trim().toLowerCase();
+    const k = groupKey(r.title);
     if (!groups.has(k)) groups.set(k, []);
     groups.get(k).push(r);
   }
   $("#count").textContent = `${rows.length} logged`;
   $("#groups").innerHTML = [...groups.values()].map(list => {
     const lower = lowerIsBetter(list[0].kind);
-    const scored = list.filter(r => r.score_value != null && r.rx);   // PR counts RX only
-    const best = scored.reduce((b, r) => !b || (lower ? r.score_value < b.score_value : r.score_value > b.score_value) ? r : b, null);
-    const chrono = list.filter(r => r.score_value != null).slice().reverse();
+    // RX and Scaled each keep their own PR.
+    const bestOf = rx => list.filter(r => r.score_value != null && r.rx === rx)
+      .reduce((b, r) => !b || (lower ? r.score_value < b.score_value : r.score_value > b.score_value) ? r : b, null);
+    const bestRx = bestOf(true), bestSc = bestOf(false);
+    const prLine = (label, b) => b ? `<p class="mono small pr">PR ${label} ${esc(b.score)} · ${fmtDay(b.day)}</p>` : "";
+    // Chart only like with like: RX if there is any, and only finished times (a capped score is not a time).
+    const chartRx = list.some(r => r.rx && r.score_value != null);
+    const chrono = list.filter(r => r.score_value != null && r.rx === chartRx && !isCapped(r)).slice().reverse();
+    const title = normalise({ title: list[0].title }).title;
     return `<div class="panel">
-      <div class="hist-head"><h2>${esc(list[0].title)}</h2><span class="label">${list.length}×</span></div>
-      ${best ? `<p class="mono small pr">PR ${esc(best.score)} · ${fmtDay(best.day)}</p>` : ""}
+      <div class="hist-head"><h2>${esc(title)}</h2><span class="label">${list.length}×</span></div>
+      ${prLine("RX", bestRx)}${prLine("Scaled", bestSc)}
       ${spark(chrono, lower)}
       ${list.map(r => `<div class="entry" data-edit="${r.id}" style="cursor:pointer"><span class="mono muted">${fmtDay(r.day)}</span>
-        <span class="mono">${esc(r.score || "-")}${r.rx ? "" : " <span class='muted'>sc</span>"}${r === best ? " <span class='pr'>PR</span>" : ""}</span>
+        <span class="mono">${esc(r.score || "-")}${r.rx ? "" : " <span class='muted'>sc</span>"}${r === bestRx || r === bestSc ? " <span class='pr'>PR</span>" : ""}</span>
         <span class="small muted">edit</span></div>
         ${r.notes ? `<p class="muted small">${esc(r.notes)}</p>` : ""}`).join("")}
     </div>`;
