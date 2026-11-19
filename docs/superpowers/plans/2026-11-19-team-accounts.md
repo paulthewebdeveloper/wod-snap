@@ -17,7 +17,7 @@
 - Sign-in: email → **6-digit code typed into the app**; never a magic link. Public sign-up **off**.
 - Roles exactly `admin` | `coach` | `athlete`. Paul = `admin`, email `paul@digitalsaints.studio`.
 - Who-sees-what enforced by RLS, never only in the front end.
-- Mail: Resend SMTP `smtp.resend.com:465`, user `resend`; sender `WOD <codes@mail.maketheclick.com>`. Keys never in the repo.
+- Mail: Resend SMTP `smtp.resend.com:465`, user `resend`; sender `WOD <codes@send.maketheclick.com>`. Keys never in the repo.
 - Remove = deactivate (`members.active = false` + auth ban); results are never deleted by removal.
 - Apple system colours and components already in `index.html`; new screens reuse its classes (`.card`, `.row`, `.hero`, `.seg`, sheet).
 
@@ -75,10 +75,10 @@
 
 **Files:** none in the repo (Supabase and Resend settings; record what was set in the spec's sign-in section).
 
-- [ ] **Step 1: In Resend (Paul signed in): add domain `mail.maketheclick.com`; add its DNS records in Cloudflare (`maketheclick.com` zone); wait until Resend shows Verified.**
-- [ ] **Step 2: Create a Resend API key `wod-snap`, sending access, domain `mail.maketheclick.com`.**
-- [ ] **Step 3: Supabase Auth config (Management API `PATCH /v1/projects/ktotbpvtkaubecmodgyb/config/auth`):** `smtp_host smtp.resend.com`, `smtp_port 465`, `smtp_user resend`, `smtp_pass <key>`, `smtp_admin_email codes@mail.maketheclick.com`, `smtp_sender_name WOD`, `disable_signup true`, `mailer_otp_length 6`, `mailer_otp_exp 600`, magic-link template body showing `{{ .Token }}` with subject "Your WOD code".
-- [ ] **Step 4: Verify**: request a code for `paul@digitalsaints.studio` (`POST /auth/v1/otp` with `create_user:false`) — email arrives from `codes@mail.maketheclick.com` with a 6-digit code; a code request for an unknown email does not create a user.
+- [ ] **Step 1: In Resend (Paul signed in): add domain `send.maketheclick.com`; add its DNS records in Cloudflare (`maketheclick.com` zone); wait until Resend shows Verified.**
+- [ ] **Step 2: Create a Resend API key `wod-snap`, sending access, domain `send.maketheclick.com`.**
+- [ ] **Step 3: Supabase Auth config (Management API `PATCH /v1/projects/ktotbpvtkaubecmodgyb/config/auth`):** `smtp_host smtp.resend.com`, `smtp_port 465`, `smtp_user resend`, `smtp_pass <key>`, `smtp_admin_email codes@send.maketheclick.com`, `smtp_sender_name WOD`, `disable_signup true`, `mailer_otp_length 6`, `mailer_otp_exp 600`, magic-link template body showing `{{ .Token }}` with subject "Your WOD code".
+- [ ] **Step 4: Verify**: request a code for `paul@digitalsaints.studio` (`POST /auth/v1/otp` with `create_user:false`) — email arrives from `codes@send.maketheclick.com` with a 6-digit code; a code request for an unknown email does not create a user.
 
 ### Task 4: Sign-in and session in the app
 

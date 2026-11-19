@@ -72,7 +72,7 @@ Paul picked 1.
 - **Codes need a custom mail sender.** Supabase's built-in sender only delivers to members of the Supabase
   organisation and only a couple of emails an hour, so teammates would never get a code. Custom SMTP is configured
   in Supabase Auth: **Resend** (Paul's pick, free tier 3,000 emails a month), SMTP `smtp.resend.com:465`, user
-  `resend`, password = a Resend API key. Sender `WOD <codes@mail.maketheclick.com>` *(builder's call: a subdomain of
+  `resend`, password = a Resend API key. Sender `WOD <codes@send.maketheclick.com>` *(builder's call: a subdomain of
   a domain already on Cloudflare, so the app's mail reputation stays apart from Paul's own mailboxes)*. Paul
   creates the Resend account and adds Resend's DNS records in Cloudflare; the key goes into Supabase's settings
   form, never into the repo.
