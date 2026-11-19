@@ -14,7 +14,7 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon.png">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
-<script type="module">import { rank } from "./rank.mjs"; window.rank = rank;</script>
+<script type="module">import { rank } from "./rank.mjs"; import { parseStations } from "./stations.mjs"; window.rank = rank; window.parseStations = parseStations;</script>
 <style>
   /* Apple's system colours, light and dark, following the phone. Blue = anything you can tap and charts,
      green = records and switches, red = delete only, grays for everything else. */
@@ -322,6 +322,7 @@
     <div class="body">
       <span class="tag hidden"></span>
       <div class="seg tall capseg hidden"><button aria-pressed="true" data-cap="0">Finished</button><button aria-pressed="false" data-cap="1">Hit the cap</button></div>
+      <div class="stations hidden" style="display:flex;flex-direction:column;gap:8px"></div>
       <div class="split">
         <label class="field"><input class="score" autocomplete="off" aria-label="Score"><span class="unit"></span></label>
         <div class="seg tall rxseg"><button aria-pressed="true" data-rx="1">RX</button><button aria-pressed="false" data-rx="0">Scaled</button></div>
@@ -380,6 +381,8 @@ function normalise(p) {
   return { ...p, title: (p.title || "").split(/\s*\/\s*/).map(x => canonMove(x)?.name || x).join(" / ") };
 }
 const groupKey = title => key(normalise({ title }).title);
+const titleCase = s => s.replace(/\b([a-z])/g, c => c.toUpperCase());
+const stationTitle = max => `${max.split(/\s*\/\s*/).map(x => canonMove(x)?.name || titleCase(x.trim())).join(" / ")} · max reps`;
 
 /* ---------- Scores ---------- */
 // ponytail: a capped for-time result is stored as CAPPED - reps, so it ranks after every finished time
@@ -395,7 +398,8 @@ function scoreValue(kind, s) {
   const n = parseFloat(s.replace(",", ".")); return Number.isFinite(n) ? n : null;
 }
 const fmtScore = r => !r.score ? "—" : isCapped(r) ? `Capped · ${CAPPED - r.score_value} reps`
-  : r.kind === "strength" && /^\d+([.,]\d+)?$/.test(r.score) ? `${r.score} kg` : r.score;
+  : r.kind === "strength" && /^\d+([.,]\d+)?$/.test(r.score) ? `${r.score} kg`
+  : r.kind === "emom" && /^\d+$/.test(r.score) ? `${r.score} reps` : r.score;
 const fmtSecs = s => `${Math.floor(s / 60)}:${String(Math.round(s % 60)).padStart(2, "0")}`;
 const better = (kind, a, b) => lowerIsBetter(kind) ? a < b : a > b;
 
@@ -521,17 +525,36 @@ function makePart(p = {}, { toggle = true } = {}) {
   const rxseg = $(".rxseg", el);
   setPressed(rxseg, $(`[data-rx="${p.rx === false ? 0 : 1}"]`, rxseg));
   rxseg.onclick = e => { const b = e.target.closest("button"); if (b) setPressed(rxseg, b); };
-  kindSel.onchange = paint; paint();
+  // EMOM with "max" stations: one reps box per station, each saved as its own entry so every movement charts on its
+  // own. Not for an entry that already is one station ("… · max reps").
+  const stationsBox = $(".stations", el), scoreField = $(".score", el).closest(".field");
+  let stations = [];
+  const paintStations = () => {
+    const isStation = / · max reps$/.test($(".title-in", el).value);
+    stations = kindSel.value === "emom" && !isStation && window.parseStations ? window.parseStations($(".presc", el).value).filter(s => s.max) : [];
+    stationsBox.classList.toggle("hidden", !stations.length);
+    scoreField.classList.toggle("hidden", !!stations.length);
+    stationsBox.innerHTML = stations.map((s, i) => `<label class="field"><span class="unit" style="min-width:64px">Station ${esc(s.label)}</span>
+      <input data-st="${i}" inputmode="numeric" placeholder="${esc(stationTitle(s.max).replace(/ · max reps$/, ""))}" aria-label="Station ${esc(s.label)} total reps"><span class="unit">reps</span></label>`).join("");
+  };
+  kindSel.onchange = () => { paint(); paintStations(); }; paint(); paintStations();
+  $(".presc", el).addEventListener("change", paintStations);
   if (!toggle) sw.remove();
   else sw.onclick = () => { const on = sw.getAttribute("aria-checked") !== "true"; sw.setAttribute("aria-checked", String(on)); el.classList.toggle("off", !on); };
   if (p.off) { sw.setAttribute("aria-checked", "false"); el.classList.add("off"); }
   el.read = day => {
     const kind = kindSel.value, raw = score.value.trim();
+    const filled = stations.map((s, i) => ({ s, v: $(`[data-st="${i}"]`, el)?.value.trim() })).filter(x => x.v);
+    if (filled.length) { // one entry per scored station
+      const base = { day, kind: "emom", prescription: $(".presc", el).value.trim() || null, rx: $('.rxseg [aria-pressed="true"]', el).dataset.rx === "1", notes: $(".notes", el).value.trim() || null };
+      return filled.map(({ s, v }) => ({ ...base, title: stationTitle(s.max), score: v.replace(/\D/g, ""), score_value: parseInt(v.replace(/\D/g, "")) || 0 }));
+    }
     const s = !raw ? null : kind === "for_time" && capped ? `cap ${raw.replace(/\D/g, "")}` : raw;
     return { day, kind, title: $(".title-in", el).value.trim(), prescription: $(".presc", el).value.trim() || null,
              score: s, score_value: scoreValue(kind, s), rx: $('.rxseg [aria-pressed="true"]', el).dataset.rx === "1",
              notes: $(".notes", el).value.trim() || null };
   };
+  el.readAll = day => [].concat(el.read(day));
   el.isOn = () => !sw.isConnected || sw.getAttribute("aria-checked") === "true";
   return el;
 }
@@ -555,7 +578,7 @@ async function openReview(parts) {
     body.append(add);
   }, async () => {
     const day = $("#sheetBody .date-row input").value || today();
-    const results = $$("#sheetBody .part").filter(el => el.isOn()).map(el => el.read(day)).filter(r => r.title);
+    const results = $$("#sheetBody .part").filter(el => el.isOn()).flatMap(el => el.readAll(day)).filter(r => r.title);
     if (!results.length) { toast("Switch on at least one part", "err"); return false; }
     try { await api("save", { method: "POST", body: JSON.stringify({ results }) }); }
     catch (err) { toast(`Not saved: ${err.message}`, "err"); return false; }
@@ -577,10 +600,15 @@ function openEdit(r) {
     };
     body.append(del);
   }, async () => {
-    const upd = $("#sheetBody .part").read($("#sheetBody .date-row input").value || r.day);
-    if (!upd.title) { toast("Give it a name", "err"); return false; }
-    try { await api(`update?id=${r.id}`, { method: "PATCH", body: JSON.stringify(upd) }); }
-    catch (e) { toast(`Not saved: ${e.message}`, "err"); return false; }
+    const out = $("#sheetBody .part").readAll($("#sheetBody .date-row input").value || r.day);
+    if (out.some(x => !x.title)) { toast("Give it a name", "err"); return false; }
+    try {
+      if (out.length === 1 && !/ · max reps$/.test(out[0].title) || out[0].title === r.title) await api(`update?id=${r.id}`, { method: "PATCH", body: JSON.stringify(out[0]) });
+      else { // the EMOM became one entry per station
+        await api("save", { method: "POST", body: JSON.stringify({ results: out }) });
+        await api(`delete?id=${r.id}`, { method: "DELETE" });
+      }
+    } catch (e) { toast(`Not saved: ${e.message}`, "err"); return false; }
     toast("Updated"); await load();
   });
 }
