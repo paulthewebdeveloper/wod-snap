@@ -49,6 +49,11 @@ const rest = (path: string, token: string, init: RequestInit = {}) =>
     ...init,
     headers: { apikey: ANON, authorization: `Bearer ${token}`, "content-type": "application/json", prefer: "return=representation" },
   });
+const service = (path: string, init: RequestInit = {}) =>
+  fetch(`${BASE}/rest/v1/${path}`, {
+    ...init,
+    headers: { apikey: SERVICE, authorization: `Bearer ${SERVICE}`, "content-type": "application/json", prefer: "return=representation" },
+  });
 const authAdmin = (path: string, init: RequestInit = {}) =>
   fetch(`${BASE}/auth/v1/admin/${path}`, {
     ...init,
@@ -125,11 +130,22 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   // Who is calling: a valid Supabase session, belonging to an active member.
   const token = (req.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "");
-  const who = token && await fetch(`${BASE}/auth/v1/user`, { headers: { apikey: ANON, authorization: `Bearer ${token}` } });
-  if (!who || !who.ok) return json({ error: "sign in again" }, 401);
-  const uid: string = (await who.json()).id;
-  const [me] = await (await rest(`members?user_id=eq.${uid}&select=*`, token)).json().catch(() => []);
+  if (!token) return json({ error: "sign in again" }, 401);
+  let uid: string, me: any;
+  try {
+    const who = await fetch(`${BASE}/auth/v1/user`, { headers: { apikey: ANON, authorization: `Bearer ${token}` } });
+    if (who.status === 401 || who.status === 403) return json({ error: "sign in again" }, 401);
+    if (!who.ok) return json({ error: "server busy, try again" }, 503);
+    uid = (await who.json()).id;
+    // The caller's own member row, read with the service role (teammates' columns are restricted for users).
+    const r = await service(`members?user_id=eq.${uid}&select=*`);
+    if (!r.ok) return json({ error: "server busy, try again" }, 503);
+    [me] = await r.json();
+  } catch {
+    return json({ error: "server busy, try again" }, 503);
+  }
   if (!me?.active) return json({ error: "not on the team" }, 403);
+  const lead = me.role === "admin" || me.role === "coach";
 
   const url = new URL(req.url), action = url.pathname.split("/").pop(), id = url.searchParams.get("id") ?? "";
   try {
@@ -167,8 +183,8 @@ Deno.serve(async (req) => {
 
     // Members. Admin and coach see everything; athletes see names only (for the team board).
     if (req.method === "GET" && action === "members") {
-      const list = await (await rest("members?select=*&order=created_at", token)).json();
-      return json(me.role === "athlete" ? list.filter((m: any) => m.active).map(({ user_id, name }: any) => ({ user_id, name })) : list);
+      if (!lead) return relay(await rest("members?select=user_id,name&order=name", token)); // names only
+      return relay(await service("members?select=*&order=created_at"));
     }
     if (req.method === "POST" && action === "members") {
       if (me.role !== "admin") return json({ error: "only the admin can add members" }, 403);
@@ -177,7 +193,7 @@ Deno.serve(async (req) => {
       const made = await authAdmin("users", { method: "POST", body: JSON.stringify({ email: email.toLowerCase(), email_confirm: true }) });
       const user = await made.json();
       if (!made.ok) return json({ error: user.msg ?? user.error_description ?? "could not create the account" }, made.status);
-      return relay(await rest("members", token, { method: "POST", body: JSON.stringify({ user_id: user.id, email: user.email, name: name ?? "", role }) }));
+      return relay(await service("members", { method: "POST", body: JSON.stringify({ user_id: user.id, email: user.email, name: name ?? "", role }) }));
     }
     if (req.method === "PATCH" && action === "members") {
       if (!UUID.test(id)) return json({ error: "bad id" }, 400);
@@ -185,7 +201,10 @@ Deno.serve(async (req) => {
       const selfEdit = id === uid && keys.every((k) => k === "name" || k === "private");
       if (!selfEdit && me.role !== "admin") return json({ error: "only the admin can change that" }, 403);
       const patch = Object.fromEntries(keys.filter((k) => ["name", "private", "role", "active"].includes(k)).map((k) => [k, body[k]]));
-      const r = await rest(`members?user_id=eq.${id}`, token, { method: "PATCH", body: JSON.stringify(patch) });
+      // Your own name/private go through as you; anything the admin changes goes through the service role.
+      const r = selfEdit
+        ? await rest(`members?user_id=eq.${id}&select=user_id,name,private`, token, { method: "PATCH", body: JSON.stringify(patch) })
+        : await service(`members?user_id=eq.${id}`, { method: "PATCH", body: JSON.stringify(patch) });
       if (r.ok && "active" in patch) {
         // Removing someone also stops their sign-in; restoring lifts it. Their results are never deleted.
         await authAdmin(`users/${id}`, { method: "PUT", body: JSON.stringify({ ban_duration: patch.active ? "none" : "876000h" }) });

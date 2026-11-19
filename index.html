@@ -159,6 +159,29 @@
            box-shadow: 0 8px 30px rgba(0,0,0,.18); display: flex; gap: 8px; align-items: center; max-width: calc(100% - 32px); }
   .toast.err { color: var(--red); }
 
+  /* Desktop: the tab bar becomes a sidebar, content sits in a centred column, sheets open as centred windows. */
+  @media (hover: hover) { .row.press:hover, .btn2:hover { background: var(--input); } .btn:hover { filter: brightness(1.08); } }
+  .drop-hint { display: none; }
+  @media (min-width: 900px) {
+    :root { --side: 232px; }
+    .view { max-width: 760px; margin-left: calc(var(--side) + max(0px, (100vw - var(--side) - 760px) / 2)); padding: 40px 32px 56px; }
+    nav.tabs { top: 0; right: auto; width: var(--side); grid-auto-flow: row; grid-auto-rows: min-content; align-content: start; gap: 2px;
+               padding: 28px 12px; border-top: 0; border-right: .5px solid var(--sep); }
+    nav.tabs::before { content: "WOD"; font-size: 22px; font-weight: 700; letter-spacing: -.01em; color: var(--label); padding: 0 12px 18px; }
+    nav.tabs button { flex-direction: row; justify-content: flex-start; gap: 12px; font-size: 15px; font-weight: 500; padding: 0 12px; min-height: 40px; border-radius: 10px; color: var(--label); }
+    nav.tabs button svg { width: 22px; height: 22px; color: var(--blue); }
+    nav.tabs button[aria-current="page"] { background: var(--blue-tint); color: var(--blue); font-weight: 600; }
+    #detail { left: var(--side); }
+    #detail .view { margin: 0 auto; }
+    #sheet { top: 50%; left: 50%; right: auto; bottom: auto; width: 560px; height: min(86vh, 900px); border-radius: 14px; translate: -50% -50%;
+             box-shadow: 0 24px 80px rgba(0,0,0,.3); }
+    .grabber { display: none; }
+    .pct { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .drop-hint { display: block; }
+    #signin { margin: 0 auto; max-width: 440px; }
+  }
+  .hero.dragging { outline: 2px dashed var(--blue); outline-offset: 4px; }
+
   @media (prefers-reduced-motion: reduce) {
     #detail { transition: opacity 200ms; transform: none; opacity: 0; pointer-events: none; }
     #detail.open { opacity: 1; pointer-events: auto; }
@@ -187,8 +210,17 @@
   </form>
 </section>
 
+<section id="offline" class="view hidden">
+  <h1>WOD</h1>
+  <div class="hero" style="margin-top:20px">
+    <h2>Couldn’t reach the server</h2>
+    <p class="sub" id="offlineWhy">Check your connection and try again.</p>
+    <button class="btn press" id="retry">Try again</button>
+  </div>
+</section>
+
 <!-- Today -->
-<main id="v-today" class="view stack">
+<main id="v-today" class="view stack hidden">
   <div style="display:flex;justify-content:space-between;align-items:flex-end">
     <div><p class="eyebrow" id="dateLine"></p><h1>Today</h1></div>
     <button class="press" id="profileBtn" aria-label="Profile" style="width:44px;height:44px;border-radius:22px;background:var(--input);color:var(--blue);display:grid;place-items:center">
@@ -199,7 +231,8 @@
     <div id="heroIdle" style="display:flex;flex-direction:column;gap:16px">
       <div class="icon-tile"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg></div>
       <div><h2>Snap the board</h2><p class="sub" style="margin-top:4px">Every section on the whiteboard, read in a couple of seconds.</p></div>
-      <label class="btn press" style="display:grid;place-items:center">Open camera<input class="pick hidden" type="file" accept="image/*" capture="environment"></label>
+      <label class="btn press" style="display:grid;place-items:center"><span id="pickLabel">Open camera</span><input class="pick hidden" type="file" accept="image/*" capture="environment"></label>
+      <p class="small drop-hint" style="text-align:center;margin-top:-6px">or drop a photo of the board anywhere on this card</p>
       <div class="grid2">
         <label class="btn2 press"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-9 9"/></svg>Upload photo<input class="pick hidden" type="file" accept="image/*"></label>
         <button class="btn2 press" id="manual"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16z"/></svg>Type it in</button>
@@ -254,7 +287,7 @@
   <div class="view" id="detailBody"></div>
 </section>
 
-<nav class="tabs" id="tabs">
+<nav class="tabs hidden" id="tabs">
   <button aria-current="page" data-go="today"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>Today</button>
   <button data-go="progress"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 19l5-6 4 3 7-9"/><path d="M15 7h5v5"/></svg>Progress</button>
   <button data-go="bench"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4h8v5a4 4 0 0 1-8 0z"/><path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8 20h8"/></svg>Benchmarks</button>
@@ -422,7 +455,8 @@ function openSheet(title, buildBody, onSave, saveLabel = "Save") {
   $("#sheetBody").innerHTML = ""; buildBody($("#sheetBody")); $("#sheetBody").scrollTop = 0;
   onSheetSave = onSave;
   sheet.classList.remove("hidden"); scrim.classList.remove("hidden");
-  sheetH = sheet.offsetHeight; if (!sheet.dataset.open) sy.value = sheetH;
+  // On desktop the sheet is a centred window; it slides in from below the screen edge.
+  sheetH = matchMedia("(min-width: 900px)").matches ? innerHeight : sheet.offsetHeight; if (!sheet.dataset.open) sy.value = sheetH;
   sheet.dataset.open = "1"; paintSheet(sy.value);
   spring(sy, 0, { response: 0.4, onUpdate: paintSheet });
 }
@@ -565,8 +599,22 @@ function shrink(file) {
     img.src = URL.createObjectURL(file);
   });
 }
-$$(".pick").forEach(i => i.onchange = async e => {
-  const file = e.target.files[0]; e.target.value = ""; if (!file) return;
+// A mouse means a computer: there is no camera to open, so the main button picks a file (and the card takes drops).
+if (matchMedia("(pointer: fine)").matches) { $("#pickLabel").textContent = "Choose a photo"; $(".pick:not([capture])").closest("label").classList.add("hidden"); $("#manual").style.gridColumn = "1 / -1"; }
+$$(".pick").forEach(i => i.onchange = e => { const file = e.target.files[0]; e.target.value = ""; if (file) readPhoto(file); });
+$("#hero").addEventListener("dragover", e => { e.preventDefault(); $("#hero").classList.add("dragging"); });
+$("#hero").addEventListener("dragleave", () => $("#hero").classList.remove("dragging"));
+$("#hero").addEventListener("drop", e => {
+  e.preventDefault(); $("#hero").classList.remove("dragging");
+  const file = [...e.dataTransfer.files].find(f => f.type.startsWith("image/"));
+  file ? readPhoto(file) : toast("Drop a photo (JPG, PNG or HEIC)", "err");
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Escape") return;
+  if (sheet.dataset.open) closeSheet(); else if (openGroupKey) closeDetail();
+});
+async function readPhoto(file) {
+  if (!$("#heroReading").classList.contains("hidden")) return; // already reading one
   const t0 = Date.now();
   $("#heroIdle").classList.add("hidden"); $("#heroReading").classList.remove("hidden");
   $("#readTitle").textContent = "Reading the board"; $("#readBar").style.width = "8%";
@@ -582,7 +630,7 @@ $$(".pick").forEach(i => i.onchange = async e => {
     $("#readBar").style.width = "100%"; $("#readTitle").textContent = `Found ${parts.length} section${parts.length > 1 ? "s" : ""}`;
     setTimeout(() => { reset(); openReview(parts); }, reduceMotion ? 0 : 350);
   } catch (err) { reset(); toast(`Couldn’t read it: ${err.message}`, "err"); }
-});
+}
 
 /* ---------- Data and grouping ---------- */
 let rows = [], groups = [];
@@ -896,7 +944,8 @@ function showSignin(message = "") {
   $("#emailStep").classList.remove("hidden"); $("#codeStep").classList.add("hidden");
   $("#emailErr").textContent = message; $("#emailErr").classList.toggle("hidden", !message);
 }
-function showApp() { $("#signin").classList.add("hidden"); go("today"); $("#tabs").classList.remove("hidden"); }
+function showApp() { $("#signin").classList.add("hidden"); $("#offline").classList.add("hidden"); go("today"); $("#tabs").classList.remove("hidden"); }
+$("#retry").onclick = () => start();
 $("#emailStep").onsubmit = async e => {
   e.preventDefault();
   const email = $("#emailIn").value.trim().toLowerCase(), btn = $("#emailStep button");
@@ -925,7 +974,18 @@ sb.auth.onAuthStateChange(ev => { if (ev === "SIGNED_OUT") showSignin(); });
 async function start() {
   const { data: { session } } = await sb.auth.getSession();
   if (!session) return showSignin();
-  try { me = await api("me"); } catch { return; }
+  $("#offline").classList.add("hidden");
+  try { me = await api("me"); }
+  catch (e) {
+    // Signed out or removed: api() already showed sign-in. Anything else (offline, server busy) gets a Retry
+    // screen instead of an empty app.
+    if ($("#signin").classList.contains("hidden")) {
+      APP_VIEWS.forEach(id => $("#" + id)?.classList.add("hidden"));
+      $("#offlineWhy").textContent = navigator.onLine ? `The server didn’t answer (${e.message}).` : "You’re offline. Check your connection and try again.";
+      $("#offline").classList.remove("hidden");
+    }
+    return;
+  }
   const lead = me.role === "admin" || me.role === "coach";
   $("#teamTab").classList.toggle("hidden", !lead);
   showApp(); await Promise.all([load(), lead ? loadMembers() : null]);

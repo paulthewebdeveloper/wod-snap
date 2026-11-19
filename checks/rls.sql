@@ -2,10 +2,11 @@
 -- Run: checks/sql.sh checks/rls.sql   → prints [] on success, the failing assert's message otherwise.
 begin;
 
--- Act as a signed-in user (or reset to the owner with null).
+-- Act as a signed-in user, or (null) as the server's service role.
 create function pg_temp.act(uid uuid) returns void language plpgsql as $$
 begin
-  if uid is null then
+  if uid is null then -- act as the wod function's service role
+    perform set_config('request.jwt.claims', '{"role":"service_role"}', true);
     perform set_config('role', 'postgres', true);
   else
     perform set_config('request.jwt.claims', json_build_object('sub', uid, 'role', 'authenticated')::text, true);
@@ -53,7 +54,18 @@ begin
   select count(*) into n from public.results where title = 'rlscheck' and user_id = Y;
   assert n = 1, 'admin should still see a private member';
 
-  -- Admin deactivates Y and makes them public again: athletes still do not see an inactive member.
+  -- Athletes see teammates' names, never their email, role or status.
+  perform pg_temp.act(X);
+  begin
+    perform email from public.members where user_id = A;
+    assert false, 'athlete read another member''s email';
+  exception when insufficient_privilege then null;
+  end;
+  select count(*) into n from public.members where name = 'A';
+  assert n = 1, 'athlete should read teammates'' names';
+
+  -- The admin deactivates Y and makes them public again (admin writes go through the server with the service role).
+  perform pg_temp.act(null);
   update public.members set private = false, active = false where user_id = Y;
   perform pg_temp.act(X);
   select count(*) into n from public.results where title = 'rlscheck' and user_id = Y;
@@ -73,19 +85,26 @@ begin
     assert false, 'athlete promoted themselves';
   exception when insufficient_privilege or raise_exception then null;
   end;
+  begin
+    update public.members set active = true where user_id = Y;
+    assert false, 'athlete restored a removed member';
+  exception when insufficient_privilege or raise_exception then null;
+  end;
   update public.members set name = 'X2' where user_id = X;
   get diagnostics n = row_count; assert n = 1, 'member should be able to rename themselves';
   insert into public.results (title, kind) values ('rlscheck', 'other');   -- user_id defaults to auth.uid()
   select count(*) into n from public.results where title = 'rlscheck' and user_id = X;
   assert n = 2, 'own insert should default user_id to the caller';
 
-  -- Only admin manages members.
+  -- Nobody changes roles directly in the database; the coach cannot touch other members at all.
   perform pg_temp.act(C);
-  update public.members set role = 'athlete' where user_id = X;
-  get diagnostics n = row_count; assert n = 0, 'coach changed a member';
-  perform pg_temp.act(A);
-  update public.members set role = 'coach' where user_id = X;
-  get diagnostics n = row_count; assert n = 1, 'admin should change roles';
+  update public.members set name = 'hacked' where user_id = X;
+  get diagnostics n = row_count; assert n = 0, 'coach renamed a member';
+  begin
+    update public.members set role = 'athlete' where user_id = X;
+    assert false, 'coach changed a role';
+  exception when insufficient_privilege or raise_exception then null;
+  end;
   perform pg_temp.act(null);
 end $$;
 
